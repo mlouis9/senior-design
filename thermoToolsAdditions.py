@@ -258,11 +258,11 @@ def solubility_calculation(temp: float, press: float, unit_ratio_of_other_compon
         masses = component_fractions_to_element_fractions(components, unique_elements)
         
         thermoTools.WriteInputScript(script_name, str(data_file), unique_elements, \
-                                     tstart, tend, ntstep, pstart, pend, npstep, masses)
+                                     tstart, tend, ntstep, pstart, pend, npstep, masses, fuzzyStoichiometry=fuzzy)
 
         # Run script
         thermoTools.RunInputScript(script_name, jsonName=str(output_path / output_name), thermochimica_path=str(thermochimica_path),
-                                   noOutput=True, fuzzy=fuzzy)
+                                   noOutput=True)
 
         output_json_path = thermochimica_path / 'outputs' / output_path / output_name
         output.add_output(output_json_path)
