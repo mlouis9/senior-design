@@ -106,10 +106,13 @@ class thermoOut:
 
 
     def _get_stable_phases(self, DEBUG=False):
+        # Below this tolerance, set phase fraction = 0
+        phase_include_tol = 1e-8
+
         stable_phases = []
         for state in self.output.values():
             solution_phases = [ (name, phase['moles']) for name, phase in  state['solution phases'].items() \
-                               if phase['moles'] != 0.0 ]
+                               if phase['moles'] > phase_include_tol ]
             pure_condensed_phases = [ (name, phase['moles']) for name, phase in  state['pure condensed phases'].items() \
                                      if phase['moles'] != 0.0 ]
             if DEBUG and (len(solution_phases) == 0 or 'MSCL' not in [solution_phase[0] for solution_phase in solution_phases]):
