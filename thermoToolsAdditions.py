@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import numpy as np
 import os
+import copy
 
 """This is a module containing all of the supporting classes and functions for running the calculations needed for my Senior Deisgn
 project. This module extends the built-in thermochimica module `thermoTools`, and contains a function for automatically executing a
@@ -189,6 +190,65 @@ def component_fractions_to_element_fractions(component_fractions, unique_element
     # Note that, since the calculation only depends on the mole fractions of the elements, rather than absolute amounts
     # we may normalize the element fractions to 1
     return element_fractions
+
+
+def get_mass_labels(left_endmember_masses: dict, right_endmember_masses: dict, elements_used: list) -> list:
+    """Utility for getting the labels of endmembers in a pseudo binary phase diagram from their compositions. This
+    code is more or less ripped directly from pseudoBinaryPhaseDiagramGUI.py
+    
+    Parameters:
+    -----------
+        left_endmember_masses: A dictionary containing component identifier - mole fraction pairs representing the left
+                               endmember
+        right_endmember_masses: A dictionary containing component identifier - mole fraction pairs representing the right
+                               endmember
+        elements_used: A list containing the string identifiers of the unique elements used in both of the endmembers
+
+    Returns:
+    --------
+        A list of two strings, containing the proper pylatex commands for rendering the endmember molecular formulas (with
+        subscripts!)
+    """
+    mass_labels = ['', '']
+    n_elements_used = len(elements_used)
+
+    # If halogens are present, make sure they are the last element to appear in each label
+    # by convention. This can be done by moving them to the end of the elements_used list
+    # and also permuting the right and left endmember masses lists correspondingly
+    if ('Cl' in elements_used) ^ ('F' in elements_used): # Note we use xor `^` to exclude albeit unphsical cases where BOTH F and Cl are present
+        if 'Cl' in elements_used:
+            halogen_index = elements_used.index('Cl')
+        else:
+            halogen_index = elements_used.index('F')
+
+        # First copy the input list to avoid side effects
+        lists_to_be_permuted = copy.deepcopy([elements_used, left_endmember_masses, right_endmember_masses])
+        for list_to_be_permuted in lists_to_be_permuted:
+            # Then shuffle the elements
+            halogen = list_to_be_permuted.pop(halogen_index)
+            list_to_be_permuted.append(halogen)
+
+        # Now save modified lists under the proper names
+        elements_used = lists_to_be_permuted[0]
+        left_endmember_masses = lists_to_be_permuted[1]
+        right_endmember_masses = lists_to_be_permuted[2]
+
+    for i in range(n_elements_used):
+        if left_endmember_masses[i] > 0:
+            mass_labels[0] += elements_used[i]
+            if left_endmember_masses[i] != 1:
+                if int(left_endmember_masses[i]) == left_endmember_masses[i]:
+                    mass_labels[0] += f'$_{ {int(left_endmember_masses[i])} }$'
+                else:
+                    mass_labels[0] += f'$_{ {left_endmember_masses[i]} }$'
+        if right_endmember_masses[i] > 0:
+            mass_labels[1] += elements_used[i]
+            if right_endmember_masses[i] != 1:
+                if int(right_endmember_masses[i]) == right_endmember_masses[i]:
+                    mass_labels[1] += f'$_{ {int(right_endmember_masses[i])} }$'
+                else:
+                    mass_labels[1] += f'$_{ {right_endmember_masses[i]} }$'
+    return mass_labels
 
 
 def get_unique_elements(components: list) -> list:
