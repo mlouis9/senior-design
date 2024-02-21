@@ -188,7 +188,7 @@ def component_fractions_to_element_fractions(component_fractions, unique_element
 
     # Note that, since the calculation only depends on the mole fractions of the elements, rather than absolute amounts
     # we may normalize the element fractions to 1
-    return element_fractions # /sum(element_fractions)
+    return element_fractions
 
 
 def get_unique_elements(components: list) -> list:
