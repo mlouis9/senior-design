@@ -1,0 +1,440 @@
+ {
+ "1":
+ {
+   "solution phases": {
+     "gas_ideal": {
+       "phase model": "IDMX",
+       "moles": 0.0,
+       "driving force":   2.7954264008088725E+001,
+       "species": {
+         "Cl": {
+           "mole fraction":   8.7103782195876051E-026 ,
+           "moles":  0.0000000000000000E+000,
+           "chemical potential":   0.0000000000000000      ,
+           "stoichiometry": [   0.0000000000000000      ,   1.0000000000000000      ]
+         },
+         "Cl2": {
+           "mole fraction":   4.5660372884108545E-039 ,
+           "moles":  0.0000000000000000E+000,
+           "chemical potential":   0.0000000000000000      ,
+           "stoichiometry": [   0.0000000000000000      ,   2.0000000000000000      ]
+         },
+         "Pu": {
+           "mole fraction":   6.7703114167651541E-020 ,
+           "moles":  0.0000000000000000E+000,
+           "chemical potential":   0.0000000000000000      ,
+           "stoichiometry": [   1.0000000000000000      ,   0.0000000000000000      ]
+         },
+         "PuCl3": {
+           "mole fraction":   7.2379796044503117E-013 ,
+           "moles":  0.0000000000000000E+000,
+           "chemical potential":   0.0000000000000000      ,
+           "stoichiometry": [   1.0000000000000000      ,   3.0000000000000000      ]
+         },
+         "PuCl4": {
+           "mole fraction":   5.4303465691349731E-025 ,
+           "moles":  0.0000000000000000E+000,
+           "chemical potential":   0.0000000000000000      ,
+           "stoichiometry": [   1.0000000000000000      ,   4.0000000000000000      ]
+         }
+       },
+       "elements": {
+         "Pu": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":  0.25000001753844980      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         },
+         "Cl": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":  0.74999998246155020      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         }
+       }
+     },
+     "MSCL": {
+       "phase model": "SUBQ",
+       "moles": 0.0,
+       "driving force":   5.1421226681102084E-001,
+       "cations": {
+         "Pu[CN=VI": {
+           "mole fraction":    1.5663252518782080E-004 ,
+           "charge":    3.0000000000000000      ,
+           "chemical group":            3
+         },
+         "Pu[Dimer": {
+           "mole fraction":   0.99984336747481206      ,
+           "charge":    6.0000000000000000      ,
+           "chemical group":            3
+         }
+       },
+       "anions": {
+         "Cl": {
+           "mole fraction":    1.0000000000000000      ,
+           "charge":   -1.0000000000000000      ,
+           "chemical group":            1
+         }
+       },
+       "moles of endmembers":    0.0000000000000000      ,
+       "endmembers": {
+         "Pu[CN=VI]Cl3": {
+           "mole fraction":    1.5663252518782080E-004 ,
+           "constituents": [ "Pu[CN=VI", "Cl" ],
+           "stoichiometric coefficients": [   1.0000000000000000      ,   3.0000000000000000      ]
+           },
+         "Pu[Dimer]Cl6": {
+           "mole fraction":   0.99984336747481206      ,
+           "constituents": [ "Pu[Dimer", "Cl" ],
+           "stoichiometric coefficients": [   1.0000000000000000      ,   6.0000000000000000      ]
+           }
+       },
+       "quadruplets": {
+         "Pu[CN=VI-Pu[CN=VI-Cl-Cl": {
+           "mole fraction":   2.0814891087643975E-007 ,
+           "moles":  0.0000000000000000E+000,
+           "chemical potential":  -338138.23498431500      ,
+           "constituents": [ "Pu[CN=VI", "Pu[CN=VI", "Cl", "Cl" ],
+           "coordination numbers": [   6.0000000000000000      ,   6.0000000000000000      ,   2.0000000000000000      ,   2.0000000000000000      ],
+           "stoichiometry": [  0.33333333333333331      ,   1.0000000000000000      ]
+         },
+         "Pu[Dimer-Pu[Dimer-Cl-Cl": {
+           "mole fraction":  0.99968694309853512      ,
+           "moles":  0.0000000000000000E+000,
+           "chemical potential":  -723604.35422039055      ,
+           "constituents": [ "Pu[Dimer", "Pu[Dimer", "Cl", "Cl" ],
+           "coordination numbers": [   6.0000000000000000      ,   6.0000000000000000      ,   1.0000000000000000      ,   1.0000000000000000      ],
+           "stoichiometry": [  0.66666666666666663      ,   2.0000000000000000      ]
+         },
+         "Pu[CN=VI-Pu[Dimer-Cl-Cl": {
+           "mole fraction":   3.1284875255388874E-004 ,
+           "moles":  0.0000000000000000E+000,
+           "chemical potential":  -537305.10811018466      ,
+           "constituents": [ "Pu[CN=VI", "Pu[Dimer", "Cl", "Cl" ],
+           "coordination numbers": [   6.0000000000000000      ,   6.0000000000000000      ,   1.3333333333333333      ,   1.3333333333333333      ],
+           "stoichiometry": [  0.50000000000000000      ,   1.5000000000000000      ]
+         }
+       },
+       "elements": {
+         "Pu": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":  0.25000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         },
+         "Cl": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":  0.75000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         }
+       }
+     },
+     "MSCL#3": {
+       "phase model": "SUBQ",
+       "moles": 0.0,
+       "driving force":   0.0000000000000000E+000,
+       "cations": {
+         "Pu[CN=VI": {
+           "mole fraction":    1.8654639862919335E-004 ,
+           "charge":    3.0000000000000000      ,
+           "chemical group":            3
+         },
+         "Pu[Dimer": {
+           "mole fraction":   0.99981345360137086      ,
+           "charge":    6.0000000000000000      ,
+           "chemical group":            3
+         }
+       },
+       "anions": {
+         "Cl": {
+           "mole fraction":    1.0000000000000000      ,
+           "charge":   -1.0000000000000000      ,
+           "chemical group":            1
+         }
+       },
+       "moles of endmembers":    0.0000000000000000      ,
+       "endmembers": {
+         "Pu[CN=VI]Cl3": {
+           "mole fraction":    1.8654639862919335E-004 ,
+           "constituents": [ "Pu[CN=VI", "Cl" ],
+           "stoichiometric coefficients": [   1.0000000000000000      ,   3.0000000000000000      ]
+           },
+         "Pu[Dimer]Cl6": {
+           "mole fraction":   0.99981345360137086      ,
+           "constituents": [ "Pu[Dimer", "Cl" ],
+           "stoichiometric coefficients": [   1.0000000000000000      ,   6.0000000000000000      ]
+           }
+       },
+       "quadruplets": {
+         "Pu[CN=VI-Pu[CN=VI-Cl-Cl": {
+           "mole fraction":   2.0814891087644076E-005 ,
+           "moles":  0.0000000000000000E+000,
+           "chemical potential":  -312205.96957448730      ,
+           "constituents": [ "Pu[CN=VI", "Pu[CN=VI", "Cl", "Cl" ],
+           "coordination numbers": [   6.0000000000000000      ,   6.0000000000000000      ,   2.0000000000000000      ,   2.0000000000000000      ],
+           "stoichiometry": [  0.33333333333333331      ,   1.0000000000000000      ]
+         },
+         "Pu[Dimer-Pu[Dimer-Cl-Cl": {
+           "mole fraction":  0.99964772209382924      ,
+           "moles":  0.0000000000000000E+000,
+           "chemical potential":  -723604.29031385563      ,
+           "constituents": [ "Pu[Dimer", "Pu[Dimer", "Cl", "Cl" ],
+           "coordination numbers": [   6.0000000000000000      ,   6.0000000000000000      ,   1.0000000000000000      ,   1.0000000000000000      ],
+           "stoichiometry": [  0.66666666666666663      ,   2.0000000000000000      ]
+         },
+         "Pu[CN=VI-Pu[Dimer-Cl-Cl": {
+           "mole fraction":   3.3146301508309856E-004 ,
+           "moles":  0.0000000000000000E+000,
+           "chemical potential":  -537833.06591399550      ,
+           "constituents": [ "Pu[CN=VI", "Pu[Dimer", "Cl", "Cl" ],
+           "coordination numbers": [   6.0000000000000000      ,   6.0000000000000000      ,   1.3333333333333333      ,   1.3333333333333333      ],
+           "stoichiometry": [  0.50000000000000000      ,   1.5000000000000000      ]
+         }
+       },
+       "elements": {
+         "Pu": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":  0.24999999999999994      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         },
+         "Cl": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":  0.75000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         }
+       }
+     },
+     "P63_M": {
+       "phase model": "QKTO",
+       "moles":   2.5000000000000000E-001,
+       "driving force":   0.0000000000000000E+000,
+       "species": {
+         "PuCl3": {
+           "mole fraction":   1.0000000000000000      ,
+           "moles":  2.5000000000000000E-001,
+           "chemical potential":  -1099315.1052686083      ,
+           "stoichiometry": [   1.0000000000000000      ,   3.0000000000000000      ]
+         }
+       },
+       "elements": {
+         "Pu": {
+           "moles of element in phase":  2.5000000000000000E-001,
+           "mole fraction of phase by element":  0.25000000000000000      ,
+           "mole fraction of element by phase":   1.0000000000000000     
+         },
+         "Cl": {
+           "moles of element in phase":  7.5000000000000000E-001,
+           "mole fraction of phase by element":  0.75000000000000000      ,
+           "mole fraction of element by phase":   1.0000000000000000     
+         }
+       }
+     },
+     "P63_M#5": {
+       "phase model": "QKTO",
+       "moles": 0.0,
+       "driving force":   0.0000000000000000E+000,
+       "species": {
+         "PuCl3": {
+           "mole fraction":   1.0000000000000000      ,
+           "moles":  0.0000000000000000E+000,
+           "chemical potential":  -1099315.1052686083      ,
+           "stoichiometry": [   1.0000000000000000      ,   3.0000000000000000      ]
+         }
+       },
+       "elements": {
+         "Pu": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":  0.25000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         },
+         "Cl": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":  0.75000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         }
+       }
+     }
+   },
+   "pure condensed phases": {
+     "Pu_L1(liq)": {
+       "moles": 0.0,
+       "chemical potential":  -49555.188717721583      ,
+       "driving force":   8.2392128586743496E-002,
+       "stoichiometry": [   1.0000000000000000      ,   0.0000000000000000      ],
+       "elements": {
+         "Pu": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":   1.0000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         },
+         "Cl": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":   0.0000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         }
+       }
+     },
+     "PuCl3_L1(liq)": {
+       "moles": 0.0,
+       "chemical potential":  -1000306.0607163933      ,
+       "driving force":   4.1175786729155419E+000,
+       "stoichiometry": [   1.0000000000000000      ,   3.0000000000000000      ],
+       "elements": {
+         "Pu": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":  0.25000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         },
+         "Cl": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":  0.75000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         }
+       }
+     },
+     "Pu_alpha(s)": {
+       "moles": 0.0,
+       "chemical potential":  -47116.172747721583      ,
+       "driving force":   4.8812637989248575E-001,
+       "stoichiometry": [   1.0000000000000000      ,   0.0000000000000000      ],
+       "elements": {
+         "Pu": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":   1.0000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         },
+         "Cl": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":   0.0000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         }
+       }
+     },
+     "Pu_beta(s2)": {
+       "moles": 0.0,
+       "chemical potential":  -49672.646625943307      ,
+       "driving force":   6.2852815585740629E-002,
+       "stoichiometry": [   1.0000000000000000      ,   0.0000000000000000      ],
+       "elements": {
+         "Pu": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":   1.0000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         },
+         "Cl": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":   0.0000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         }
+       }
+     },
+     "Pu_gamma(s3)": {
+       "moles": 0.0,
+       "chemical potential":  -49909.006804871133      ,
+       "driving force":   2.3533917548441252E-002,
+       "stoichiometry": [   1.0000000000000000      ,   0.0000000000000000      ],
+       "elements": {
+         "Pu": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":   1.0000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         },
+         "Cl": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":   0.0000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         }
+       }
+     },
+     "Pu_FCC_A1(s4)": {
+       "moles": 0.0,
+       "chemical potential":  -50050.477732091560      ,
+       "driving force":   0.0000000000000000E+000,
+       "stoichiometry": [   1.0000000000000000      ,   0.0000000000000000      ],
+       "elements": {
+         "Pu": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":   1.0000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         },
+         "Cl": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":   0.0000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         }
+       }
+     },
+     "Pu_tetragonal(s5)": {
+       "moles": 0.0,
+       "chemical potential":  -50048.860468271800      ,
+       "driving force":   2.6903445206905019E-004,
+       "stoichiometry": [   1.0000000000000000      ,   0.0000000000000000      ],
+       "elements": {
+         "Pu": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":   1.0000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         },
+         "Cl": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":   0.0000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         }
+       }
+     },
+     "Pu_BCC_A2(s6)": {
+       "moles": 0.0,
+       "chemical potential":  -49967.951100964819      ,
+       "driving force":   1.3728438560816514E-002,
+       "stoichiometry": [   1.0000000000000000      ,   0.0000000000000000      ],
+       "elements": {
+         "Pu": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":   1.0000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         },
+         "Cl": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":   0.0000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         }
+       }
+     },
+     "PuCl3_P63/M_No.176(s)": {
+       "moles": 0.0,
+       "chemical potential":  -1099315.1052686083      ,
+       "driving force":   0.0000000000000000E+000,
+       "stoichiometry": [   1.0000000000000000      ,   3.0000000000000000      ],
+       "elements": {
+         "Pu": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":  0.25000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         },
+         "Cl": {
+           "moles of element in phase":  0.0000000000000000E+000,
+           "mole fraction of phase by element":  0.75000000000000000      ,
+           "mole fraction of element by phase":   0.0000000000000000     
+         }
+       }
+     }
+   },
+   "elements": {
+     "Pu": {
+       "moles":   0.25000000000000000      ,
+       "element potential":  -5.0050477732091560E+004
+     },
+     "Cl": {
+       "moles":   0.75000000000000000      ,
+       "element potential":  -3.4975487584550562E+005
+     }
+   },
+   "temperature":    723.00000000000000      ,
+   "pressure":    1.0000000000000000      ,
+   "integral Gibbs energy":  -2.7482877631715208E+005,
+   "entropy":   0.0000000000000000E+000,
+   "enthalpy":   0.0000000000000000E+000,
+   "heat capacity":   0.0000000000000000E+000,
+   "functional norm":    0.0000000000000000      ,
+   "GEM iterations":            1 ,
+   "# solution phases":            1 ,
+   "# pure condensed phases":            0
+ }
+ }
