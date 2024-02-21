@@ -4,6 +4,8 @@ from pathlib import Path
 import numpy as np
 import os
 import copy
+import pseudoBinaryPhaseDiagramFunctions as pbpd
+import matplotlib.pyplot as plt
 
 """This is a module containing all of the supporting classes and functions for running the calculations needed for my Senior Deisgn
 project. This module extends the built-in thermochimica module `thermoTools`, and contains a function for automatically executing a
@@ -335,3 +337,69 @@ def solubility_calculation(temp: float, press: float, unit_ratio_of_other_compon
     os.remove(str(output_path / output_name))
 
     return output
+
+def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, output_name: str, data_file: Path, xlo: float, xhi: float, nxstep: int, \
+                              tlo: float, thi: float, ntstep: int, elements_used: list, left_endmember_composition: dict, \
+                              right_endmember_composition: dict, press: float=1, tunit: str='K', punit: str='atm', munit: str='moles', \
+                              input_file_name: str='runThermochimica.ti', fuzzy: bool=True) -> pbpd.diagram:
+    """Function for performing a pseudo binary calculation. This performs most of the tedious IO tasks, and properly converts from component compositions
+    to element fractions, etc.
+    
+    Parameters:
+    -----------
+        thermochimica_path:
+        output_path:
+        output_name:
+        data_file:
+        xlo: The low composition (usually 0.0)
+        xhi: The high composition (usually 1.0)
+        nxstep: The number of composition steps to partition the interval [xlo, xhi] into
+        tlo: The low temperature of the phase diagram
+        thi: The high temperature of the phase diagram
+        ntstep: The number of temperature steps to partition the interval [tlo, thi] into
+        elements_used: A list containing the string identifiers of the unique elments which the endmembers are composed of
+        left_endmember_composition: A dictionary containing the component identifiers and mole fractions of the left endmember
+        right_endmember_composition: A dictionary containing the component identifiers and mole fractions of the right endmember
+        press:
+        tunit:
+        punit:
+        munit:
+        input_file_name:
+        fuzzy:
+    
+    Returns:
+    --------
+        A pseudo binary phase diagram object containing the relevant calculation results
+
+    """
+    left_endmember_masses = component_fractions_to_element_fractions(left_endmember_composition, elements_used)
+    right_endmember_masses = component_fractions_to_element_fractions(right_endmember_composition, elements_used)
+
+    sum1 = sum(left_endmember_masses)
+    sum2 = sum(right_endmember_masses)
+
+    mass_labels = get_mass_labels(left_endmember_masses, right_endmember_masses, elements_used)
+
+    # Now normalize left and right endmember masses, NOTE this is REQUIRED for the plotting and postprocessing to behave
+    left_endmember_masses = list( left_endmember_masses / sum1 )
+    right_endmember_masses = list( right_endmember_masses / sum2 )
+
+    plane = [left_endmember_masses, right_endmember_masses]
+
+    if tunit == 'K':
+        tshift = 0
+    elif tunit == 'C':
+        tshift = 273.15
+    else:
+        assert(f"Invalid temperature unit \'{tunit}\' provided")
+
+    mint = tlo + tshift
+    maxt = thi + tshift
+
+    calc = pbpd.diagram(data_file, active=True, interactivePlot=True, inputFileName="runThermochimica.ti", \
+                    outputFileName=str(output_path / output_name), thermochimicaPath=thermochimica_path)
+
+    calc.initRun(press, tunit, punit, plane, sum1, sum2, mint, maxt, elements_used, mass_labels, munit, tshift, fuzzy=fuzzy)
+    calc.runCalc(xlo, xhi, nxstep, tlo, thi, ntstep)
+    calc.processPhaseDiagramData()
+    return calc
