@@ -60,7 +60,15 @@ class thermoOut:
         """
         # Read the temperatures and pressures represented in this calculation
         if not null:
-            self.temperatures = np.array([ state['temperature'] for state in self.output.values()])
+            # self.temperatures = np.array([ state['temperature'] for state in self.output.values()])
+            arr = []
+            for key, state in self.output.items():
+                try:
+                    arr.append(state['temperature'])
+                except:
+                    print(key)
+            self.temperatures = np.array(arr)
+
             self.stable_phases = self._get_stable_phases()
             self.elements = set( element for state in  list(self.output.values()) \
                                  for element in list(state['elements'].keys()) ) # Get unique elements corresponding to each of the
@@ -192,7 +200,8 @@ def get_unique_elements(components: list) -> list:
 
 def solubility_calculation(temp: float, press: float, unit_ratio_of_other_components: dict, component_to_vary: str, n_comp_step: int, \
                            thermochimica_path: Path, output_path: Path, output_name: str, data_file: Path, \
-                            compstart: float=0.0, compstop: float=1.0, script_name: str="thermoInput.ti") -> thermoOut:
+                           compstart: float=0.0, compstop: float=1.0, script_name: str="thermoInput.ti", \
+                           fuzzy: bool=False) -> thermoOut:
     """Function for performing a sequence of thermochimica calculations at a fixed temperature and pressure
     corresponding to varying one component of a system (e.g. PuCl3) while keeping the others in a fixed ratio
     
@@ -218,6 +227,7 @@ def solubility_calculation(temp: float, press: float, unit_ratio_of_other_compon
         compend: The final mole fraction of `component_to_be_varied`
         script_name: Name of the input script to be created in the directory where this script is run from, by default \"runThermochimica\"
                      this will be deleted after each calculation
+        fuzzy: Whether the calculation should be run with fuzzy stochiometry
     
     Returns:sum(element_fractions)
     --------
@@ -252,7 +262,7 @@ def solubility_calculation(temp: float, press: float, unit_ratio_of_other_compon
 
         # Run script
         thermoTools.RunInputScript(script_name, jsonName=str(output_path / output_name), thermochimica_path=str(thermochimica_path),
-                                   noOutput=True)
+                                   noOutput=True, fuzzy=fuzzy)
 
         output_json_path = thermochimica_path / 'outputs' / output_path / output_name
         output.add_output(output_json_path)
