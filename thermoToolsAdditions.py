@@ -114,7 +114,7 @@ class thermoOut:
             solution_phases = [ (name, phase['moles']) for name, phase in  state['solution phases'].items() \
                                if phase['moles'] > phase_include_tol ]
             pure_condensed_phases = [ (name, phase['moles']) for name, phase in  state['pure condensed phases'].items() \
-                                     if phase['moles'] != 0.0 ]
+                                     if phase['moles'] > phase_include_tol ]
             if DEBUG and (len(solution_phases) == 0 or 'MSCL' not in [solution_phase[0] for solution_phase in solution_phases]):
                 print([solution_phase[0] for solution_phase in solution_phases], state['temperature'])
                 
