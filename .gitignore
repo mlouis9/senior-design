@@ -1,3 +1,4 @@
 # Ignore thermochimica input and ouput .json files
 *.ti
 *.json
+*.pyc

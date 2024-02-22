@@ -65,11 +65,22 @@ class thermoOut:
         if not null:
             # self.temperatures = np.array([ state['temperature'] for state in self.output.values()])
             arr = []
+            bad_keys = []
             for key, state in self.output.items():
                 try:
                     arr.append(state['temperature'])
                 except:
-                    print(key)
+                    # There is a problem with this state, i.e. it is either completely empty or missing required data, print
+                    # the key for debugging purposes
+                    print(f"Warning: state {key} is missing data! Excluding this state from output")
+                    
+                    # Now addd this to the list of bad keys
+                    bad_keys.append(key)
+
+            # Now remove all bad keys
+            for key in bad_keys:
+                self.output.pop(key)
+
             self.temperatures = np.array(arr)
 
             self.stable_phases = self._get_stable_phases()
