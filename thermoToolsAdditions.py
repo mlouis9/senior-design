@@ -83,7 +83,6 @@ class thermoOut:
 
             self.temperatures = np.array(arr)
 
-            self.stable_phases = self._get_stable_phases()
             self.elements = set( element for state in  list(self.output.values()) \
                                  for element in list(state['elements'].keys()) ) # Get unique elements corresponding to each of the
                                                                                  # states, should be the SAME for all states (although
@@ -91,6 +90,7 @@ class thermoOut:
                                                                                  # thermochimica does not add elements with zero mole
                                                                                  # fractions to output.json, though they should still
                                                                                  # be included for our purposes
+            self.stable_phases = self._get_stable_phases()
             self.mole_fraction_element_by_phase = self._get_mole_fraction_element_by_phase()
 
         else:
@@ -119,20 +119,25 @@ class thermoOut:
         self._reinitialize()
 
 
-    def _get_stable_phases(self, DEBUG=False):
+    def _get_stable_phases(self):
         # Below this tolerance, set phase fraction = 0
         phase_include_tol = 1e-8
 
         stable_phases = []
         for state in self.output.values():
-            solution_phases = [ (name, phase['moles']) for name, phase in  state['solution phases'].items() \
-                               if phase['moles'] > phase_include_tol ]
-            pure_condensed_phases = [ (name, phase['moles']) for name, phase in  state['pure condensed phases'].items() \
-                                     if phase['moles'] > phase_include_tol ]
-            if DEBUG and (len(solution_phases) == 0 or 'MSCL' not in [solution_phase[0] for solution_phase in solution_phases]):
-                print([solution_phase[0] for solution_phase in solution_phases], state['temperature'])
-                
-            stable_phases.append(solution_phases + pure_condensed_phases)            
+            phase_types = ['solution phases', 'pure condensed phases']
+            phases = []
+            for phase_type in phase_types:
+                for name, phase in state[phase_type].items():
+                    if phase['moles'] > phase_include_tol:
+                        # First add phase composition
+                        phase_composition = []
+                        for element in self.elements:
+                            # NOTE not all elements are in all phases
+                            if element in phase['elements']:
+                                phase_composition.append( phase['elements'][element]['mole fraction of phase by element'] )
+                        phases.append( (name, phase['moles'], phase_composition) )
+            stable_phases.append(phases)            
 
         return stable_phases
     
@@ -141,7 +146,7 @@ class thermoOut:
         for element in self.elements:
             for state_index, state in enumerate(self.output.values()):
                 mole_frac_element_by_phase[element].append([]) # Add an empty list corresponding to the given state
-                for stable_phase, _ in self.stable_phases[state_index]: # [0] is the state name, [1] is the mole fraction
+                for stable_phase, _, _ in self.stable_phases[state_index]: # [0] is the phase name, [1] is the mole fraction, [2] is the composition
                     # First get phase type
                     if stable_phase in list(state['solution phases'].keys()):
                         phase_type = 'solution phases'
