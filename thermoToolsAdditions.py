@@ -95,7 +95,7 @@ class thermoOut:
 
         else:
             self.temperatures = []
-            self.stable_phases = []
+            self.stable_phases = dict()
             self.mole_fraction_element_by_phase = {}
             self.elements = []
 
@@ -123,8 +123,8 @@ class thermoOut:
         # Below this tolerance, set phase fraction = 0
         phase_include_tol = 1e-8
 
-        stable_phases = []
-        for state in self.output.values():
+        stable_phases = dict()
+        for state_name, state in self.output.items():
             phase_types = ['solution phases', 'pure condensed phases']
             phases = []
             for phase_type in phase_types:
@@ -137,7 +137,7 @@ class thermoOut:
                             if element in phase['elements']:
                                 phase_composition.append( phase['elements'][element]['mole fraction of phase by element'] )
                         phases.append( (name, phase['moles'], phase_composition) )
-            stable_phases.append(phases)            
+            stable_phases.update({state_name: phases})
 
         return stable_phases
     
@@ -146,7 +146,7 @@ class thermoOut:
         for element in self.elements:
             for state_index, state in enumerate(self.output.values()):
                 mole_frac_element_by_phase[element].append([]) # Add an empty list corresponding to the given state
-                for stable_phase, _, _ in self.stable_phases[state_index]: # [0] is the phase name, [1] is the mole fraction, [2] is the composition
+                for stable_phase, *_ in self.stable_phases[str(state_index + 1)]: # [0] is the phase name, [1] is the mole fraction, [2] is the composition
                     # First get phase type
                     if stable_phase in list(state['solution phases'].keys()):
                         phase_type = 'solution phases'
@@ -163,6 +163,22 @@ class thermoOut:
                         mole_frac_element_by_phase[element][state_index].append( ( stable_phase, 0 ) )
         return mole_frac_element_by_phase
 
+
+class pseudoBinaryDiagram(thermoOut):
+    """A class which extends thermoOut for use in making pseudo binary phase diagrams"""
+    def __init__(self, left_endmember_composition: dict, right_endmember_composition: dict, out_file: Path = None):
+        # First create a thermoOut object with the output file
+        super().__init__(out_file)
+        self.left_endmember = left_endmember_composition
+        self.right_endmember = right_endmember_composition
+
+    def _get_boundary_points(self):
+        # Assuming a common carrier element (e.g. Cl or F), the number of components that determine the number of degrees of freedom is given
+        # by the number of elements -1 (the carrier), thus the phase boundaries occur when F = 1 = 2 + C - P ==> P = 1 + C = number of elements
+
+        self.phase_boundaries = [ phases for phases in self.stable_phases if len(phases) == len(self.elements)]
+
+    # def plot_phase_boundaries(self):
 
 
 # ---------------------------------
@@ -208,6 +224,67 @@ def component_fractions_to_element_fractions(component_fractions, unique_element
     # Note that, since the calculation only depends on the mole fractions of the elements, rather than absolute amounts
     # we may normalize the element fractions to 1
     return element_fractions
+
+
+def elements_from_component_key(component_key):
+    return [element.split('_')[0] for element in component_key.split()]
+
+def element_to_component_fractions_pseudo_binary(left_endmember_composition, right_endmember_composition, element_composition):
+    """Function for taking element fractions (read from thermochimica output.json) and translating them to component fractions
+    endmembers for a pseudo binary system. This may result in errors if the incorrect endmembers are provided, because there may
+    be no solutions"""
+
+    # First, get the element compositions of the endmembers and normalize them (thermochimica results are normalized for pesudo binary
+    # calculaltions)
+    unique_elements = []
+    for key in left_endmember_composition.keys():
+        unique_elements += elements_from_component_key(key)
+    for key in right_endmember_composition.keys():
+        unique_elements += elements_from_component_key(key)
+    unique_elements = list(set(unique_elements))
+    left_endmember_element_composition = component_fractions_to_element_fractions(left_endmember_composition, unique_elements)
+    left_endmember_element_composition = list(left_endmember_element_composition / sum(left_endmember_element_composition))
+
+    right_endmember_element_composition = component_fractions_to_element_fractions(right_endmember_composition, unique_elements)
+    right_endmember_element_composition = list(right_endmember_element_composition / sum(right_endmember_element_composition))
+
+    # Now, find the element(s) in the right endmember that are not present in the left-endmember
+    for index, _ in enumerate(unique_elements):
+        if (left_endmember_element_composition[index] == 0) and (right_endmember_element_composition[index] != 0):
+            unique_endmember_index = index
+            unique_endmember_element = unique_elements[index]
+            break
+
+    # Now can easily calculate mole fraction of the right endmember via
+    if unique_endmember_element in element_composition:
+        frac_right_endmember = element_composition[unique_endmember_element]/right_endmember_element_composition[unique_endmember_index]
+    else:
+        frac_right_endmember = 0 # Thermochimica doesn't print elements with zero mole fractions in output.json
+
+
+    # Now, make sure that endmembers were properly specified. If not, the mole fraction computed above may not result in the correct element_composition
+    calculated_element_composition = { element: 0.0 for element in unique_elements }
+
+    left_endmember_elements = []
+    right_endmember_elements = []
+    for component_key in left_endmember_composition.keys():
+        left_endmember_elements += elements_from_component_key(component_key)
+    for component_key in right_endmember_composition.keys():
+        right_endmember_elements += elements_from_component_key(component_key)
+
+    for index, element in enumerate(unique_elements):
+        if element in left_endmember_elements:
+            calculated_element_composition[element] += (1-frac_right_endmember)*left_endmember_element_composition[index]
+        if element in right_endmember_elements:
+            calculated_element_composition[element] += frac_right_endmember*right_endmember_element_composition[index]
+    
+    # Now get rid of zero values (which won't be present in teh original 'element_composition')
+    calculated_element_composition = {key: value for key, value in calculated_element_composition.items() if value != 0}
+
+    # Now convert to element fractions to compare with the original 'element_composition'
+    assert calculated_element_composition == element_composition, f"Inconsistent endmembers {left_endmember_composition} and {right_endmember_composition} specified for the given element_composition! No solution can be found."
+
+    return frac_right_endmember
 
 
 def get_mass_labels(left_endmember_masses: dict, right_endmember_masses: dict, elements_used: list) -> list:
