@@ -6,6 +6,7 @@ import os
 import copy
 import pseudoBinaryPhaseDiagramFunctions as pbpd
 import matplotlib.pyplot as plt
+import math
 
 """This is a module containing all of the supporting classes and functions for running the calculations needed for my Senior Deisgn
 project. This module extends the built-in thermochimica module `thermoTools`, and contains a function for automatically executing a
@@ -64,11 +65,11 @@ class thermoOut:
         # Read the temperatures and pressures represented in this calculation
         if not null:
             # self.temperatures = np.array([ state['temperature'] for state in self.output.values()])
-            arr = []
+            self.temperatures = dict()
             bad_keys = []
             for key, state in self.output.items():
                 try:
-                    arr.append(state['temperature'])
+                    self.temperatures.update({key: state['temperature']})
                 except:
                     # There is a problem with this state, i.e. it is either completely empty or missing required data, print
                     # the key for debugging purposes
@@ -81,8 +82,6 @@ class thermoOut:
             for key in bad_keys:
                 self.output.pop(key)
 
-            self.temperatures = np.array(arr)
-
             self.elements = set( element for state in  list(self.output.values()) \
                                  for element in list(state['elements'].keys()) ) # Get unique elements corresponding to each of the
                                                                                  # states, should be the SAME for all states (although
@@ -94,7 +93,7 @@ class thermoOut:
             self.mole_fraction_element_by_phase = self._get_mole_fraction_element_by_phase()
 
         else:
-            self.temperatures = []
+            self.temperatures = dict()
             self.stable_phases = dict()
             self.mole_fraction_element_by_phase = {}
             self.elements = []
@@ -172,11 +171,47 @@ class pseudoBinaryDiagram(thermoOut):
         self.left_endmember = left_endmember_composition
         self.right_endmember = right_endmember_composition
 
-    def _get_boundary_points(self):
-        # Assuming a common carrier element (e.g. Cl or F), the number of components that determine the number of degrees of freedom is given
-        # by the number of elements -1 (the carrier), thus the phase boundaries occur when F = 1 = 2 + C - P ==> P = 1 + C = number of elements
+        # Now add a new attribute that is a dictionary of the mole fraction of right endmember and state
+        self.mol_frac_right_endmemebr = {\
+            state_key: \
+                element_to_component_fractions_pseudo_binary(\
+                    left_endmember_composition, right_endmember_composition, \
+                    { element_name: element_dict['moles'] for element_name, element_dict in self.output[state_key]['elements'].items() }\
+                                                                )\
+                                          for state_key, _ in self.output.items() }
+        
+        # Now get regions
+        self._get_phase_regions()
 
-        self.phase_boundaries = [ phases for phases in self.stable_phases if len(phases) == len(self.elements)]
+    # def _get_boundary_points(self):
+    #     # Assuming a common carrier element (e.g. Cl or F), the number of components that determine the number of degrees of freedom is given
+    #     # by the number of elements -1 (the carrier), thus the phase boundaries occur when F = 1 = 2 + C - P ==> P = 1 + C = number of elements
+
+    #     self.phase_boundaries = [ phases for phases in self.stable_phases if len(phases) == len(self.elements)]
+    def _get_phase_regions(self):
+        """Function for getting the unique phase regions for each set of stable phases, these will partition the composition/temperature space
+        into regions, after which we can find the boundaries"""
+
+        # Assuming a common carrier element (e.g. Cl or F), the number of components that determine the number of components is given
+        # by the number of elements -1 (the carrier), thus the phase boundaries occur when F = 1 = 2 + C - P ==> P = 1 + C = number of elements.
+        # So the regions with two degrees of freedom (areas on the phase diagram) are those for which P = number of elements - 1
+
+        region_points = { state_key: phases for state_key, phases in self.stable_phases.items() if len(phases) == len(self.elements) - 1 }
+        self.regions = dict()
+
+        for state_key, phases in region_points.items():
+            phase_names = set(phase[0] for phase in phases)
+
+            # As a dictionary key, we use a frozenset which is an immutable set object which will allow us to use an order-indepenent
+            # way of accessing the points associated with a given set of phases
+            phases_key = frozenset(phase_names)
+
+            if phases_key in self.regions:
+                self.regions[phases_key].append( ( self.mol_frac_right_endmemebr[state_key], self.temperatures[state_key] ) )
+            else:
+                self.regions.update({phases_key: [(self.mol_frac_right_endmemebr[state_key], self.temperatures[state_key])]})
+
+
 
     # def plot_phase_boundaries(self):
 
@@ -228,6 +263,7 @@ def component_fractions_to_element_fractions(component_fractions, unique_element
 
 def elements_from_component_key(component_key):
     return [element.split('_')[0] for element in component_key.split()]
+
 
 def element_to_component_fractions_pseudo_binary(left_endmember_composition, right_endmember_composition, element_composition):
     """Function for taking element fractions (read from thermochimica output.json) and translating them to component fractions
@@ -281,8 +317,22 @@ def element_to_component_fractions_pseudo_binary(left_endmember_composition, rig
     # Now get rid of zero values (which won't be present in teh original 'element_composition')
     calculated_element_composition = {key: value for key, value in calculated_element_composition.items() if value != 0}
 
+    def are_dicts_almost_equal(a, b, tolerance=1e-9):
+        # Check if the keys are the same
+        if set(a.keys()) != set(b.keys()):
+            return False
+        
+        # Check if the values are almost equal for each key
+        for key in a:
+            if not math.isclose(a[key], b[key], abs_tol=tolerance):
+                return False
+        
+        return True
+
     # Now convert to element fractions to compare with the original 'element_composition'
-    assert calculated_element_composition == element_composition, f"Inconsistent endmembers {left_endmember_composition} and {right_endmember_composition} specified for the given element_composition! No solution can be found."
+    # Note, there will be some roundoff error when computing the "calculated_element_composition" dict, so we assert that these dictionaries must
+    # be within some absolute tolerance (by default taken to be 1e-9) of each other
+    assert are_dicts_almost_equal(calculated_element_composition, element_composition), f"Inconsistent endmembers {left_endmember_composition} and {right_endmember_composition} specified for the given element_composition {element_composition}! No solution can be found."
 
     return frac_right_endmember
 
