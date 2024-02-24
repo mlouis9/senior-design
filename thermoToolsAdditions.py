@@ -8,6 +8,7 @@ import pseudoBinaryPhaseDiagramFunctions as pbpd
 import matplotlib.pyplot as plt
 import math
 from scipy.spatial import ConvexHull
+import scipy
 
 """This is a module containing all of the supporting classes and functions for running the calculations needed for my Senior Deisgn
 project. This module extends the built-in thermochimica module `thermoTools`, and contains a function for automatically executing a
@@ -237,12 +238,18 @@ class pseudoBinaryDiagram(thermoOut):
             reduced_area = reduced_hull.volume
             return (original_area - reduced_area) / original_area
 
+
+        # Dictionary that keeps track of any phases that are being excluded entirely
+        exclusions = {region_key: False for region_key in self.regions.keys()}
+
         for region_key, points in self.regions.items():
             # Compute the convex hull of the points in a given phase region. NOTE the convex hull of a set of points is the smallest polygon that
             # contains all of the points
 
             if points.shape[0] < 4:
-                # Cannot make a convex hull with less than 3 points, and cannot remove a point (and still calculate area) without 4 points
+                # Cannot make a convex hull with less than 3 points, and cannot remove a point (and still calculate area) without 4 points. These
+                # regions are generally the result of roundoff (being so small) so we exclude them
+                exclusions[region_key] = True
                 continue
 
             hull = ConvexHull(points)
@@ -255,7 +262,13 @@ class pseudoBinaryDiagram(thermoOut):
                 boundary_vertices = filtered_points[hull.vertices]
                 fractional_area_decreases= []
                 for boundary_vertex in boundary_vertices:
-                    fractional_area_decreases.append((boundary_vertex, fractional_area_decrease(filtered_points, hull, boundary_vertex)))
+                    try:
+                        fractional_area_decreases.append((boundary_vertex, fractional_area_decrease(filtered_points, hull, boundary_vertex)))
+                    except scipy.spatial.qhull.QhullError:
+                        # These types of errors are generally due to flat polygons
+                        # Not any express reason to exclude these regions at the moment
+                        # exclusions[region_key] = True
+                        break
 
                 # Find point that maximizes the fractional area decrease
                 max_point, max_decrease = max(fractional_area_decreases, key=lambda x: x[1])
@@ -270,36 +283,68 @@ class pseudoBinaryDiagram(thermoOut):
                 if filtered_points.shape[0] > 3:
                     hull = ConvexHull(filtered_points)
                 else:
-                    # Cannot calculate the area of a convex hull with two points
+                    # Cannot calculate the area of a convex hull with two points, also, convex hulls that degenerate to the minimum like this with
+                    # a reasonable threshold value are generally extraneous phases, so exclude them from self.regions
+                    exclusions[region_key] = True
                     break
                
             # Now overwrite region points with filtered points
             self.regions[region_key] = filtered_points
 
 
-    def plot_phase_regions(self, plot_marker='.'):
-        # Initialize the phase_region_plot attribute
-        self.phase_region_plot = plotObject()
-        self.phase_region_plot.fig = None
-        self.phase_region_plot.ax = None
+        # Now exclude regions
+        for region_key, exclude in exclusions.items():
+            if exclude:
+                self.regions.pop(region_key)
 
-        self.phase_region_plot.fig, self.phase_region_plot.ax = plt.subplots()
+    def plot_phase_regions(self, plot_mode='boundary',plot_marker='.'):
+        """Function for plotting phase boundaries
+        
+        Parameters:
+        -----------
+            plot_mode: Specifies how the phase regions should be plotted: either 'boundary' or 'region'. Boundary plots only the boundaries
+                       of each region, while region plots the entire region (this can be helpful for debugging)
+
+        Returns:
+        --------
+            None
+        """
+
+        # First filter the phase_points
+        self._filter_phase_points()
+
+        # Initialize the phase_region_plot attribute
+        self.plot = plotObject()
+        self.plot.fig = None
+        self.plot.ax = None
+
+        self.plot.fig, self.plot.ax = plt.subplots()
 
         color = iter(plt.cm.rainbow(np.linspace(0, 1, len(self.regions.keys()))))
         for phase_names, phase_region in self.regions.items():
             c = next(color)
 
-            x_points = phase_region[:, 0]
-            y_points = phase_region[:, 1]
+            labels = []
+            if plot_mode == 'boundary' and phase_region.shape[0] >= 3:
+                # Plot only the boundary
+                hull = ConvexHull(phase_region)
+                points = phase_region[hull.vertices]
 
-            self.phase_region_plot.ax.plot(x_points, y_points, plot_marker, c=c, label = '+'.join(phase_names))
+                # Now add an additional copy of the first point to close the boundary
+                points = np.append(points, [phase_region[hull.vertices[0]]], axis=0)
+            else:
+                points = phase_region
+            x_points = points[:, 0]
+            y_points = points[:, 1]
 
-        self.phase_region_plot.ax.set_xlim(0,1)
+            self.plot.ax.plot(x_points, y_points, plot_marker, c=c, label = '+'.join(phase_names))
+
+        self.plot.ax.set_xlim(0,1)
         title = " $-$ ".join(self.mass_labels)
-        self.phase_region_plot.ax.set_title(r'{0} phase diagram'.format(title))
-        self.phase_region_plot.ax.set_xlabel(r'Mole fraction {0}'.format(self.mass_labels[1]))
-        self.phase_region_plot.ax.set_ylabel("Temperature [K]")
-        self.phase_region_plot.ax.legend(loc='upper right', bbox_to_anchor=(1.5, 1))
+        self.plot.ax.set_title(r'{0} phase diagram'.format(title))
+        self.plot.ax.set_xlabel(r'Mole fraction {0}'.format(self.mass_labels[1]))
+        self.plot.ax.set_ylabel("Temperature [K]")
+        self.plot.ax.legend(loc='upper right', bbox_to_anchor=(1.5, 1))
 
         plt.show()
 
