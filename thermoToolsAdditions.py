@@ -82,13 +82,13 @@ class thermoOut:
             for key in bad_keys:
                 self.output.pop(key)
 
-            self.elements = set( element for state in  list(self.output.values()) \
-                                 for element in list(state['elements'].keys()) ) # Get unique elements corresponding to each of the
-                                                                                 # states, should be the SAME for all states (although
-                                                                                 # different mol fractions are possible). NOTE that
-                                                                                 # thermochimica does not add elements with zero mole
-                                                                                 # fractions to output.json, though they should still
-                                                                                 # be included for our purposes
+            self.elements = list( set( element for state in  list(self.output.values()) \
+                                 for element in list(state['elements'].keys()) ) ) # Get unique elements corresponding to each of the
+                                                                                   # states, should be the SAME for all states (although
+                                                                                   # different mol fractions are possible). NOTE that
+                                                                                   # thermochimica does not add elements with zero mole
+                                                                                   # fractions to output.json, though they should still
+                                                                                   # be included for our purposes
             self.stable_phases = self._get_stable_phases()
             self.mole_fraction_element_by_phase = self._get_mole_fraction_element_by_phase()
 
@@ -141,18 +141,19 @@ class thermoOut:
         return stable_phases
     
     def _get_mole_fraction_element_by_phase(self):
-        mole_frac_element_by_phase = { element: [] for element in self.elements }
+        mole_frac_element_by_phase = { element: {} for element in self.elements }
         for element in self.elements:
-            for state_index, state in enumerate(self.output.values()):
-                mole_frac_element_by_phase[element].append([]) # Add an empty list corresponding to the given state
-                for stable_phase, *_ in self.stable_phases[str(state_index + 1)]: # [0] is the phase name, [1] is the mole fraction, [2] is the composition
+            for state_index, state in self.output.items():
+                mole_frac_element_by_phase[element].update({state_index: []}) # Add an empty list corresponding to the given state
+                for stable_phase, *_ in self.stable_phases[state_index]: # [0] is the phase name, [1] is the mole fraction, [2] is the composition
                     # First get phase type
                     if stable_phase in list(state['solution phases'].keys()):
                         phase_type = 'solution phases'
                     else:
                         phase_type = 'pure condensed phases'
 
-                    # Then save mole fraction of element by phase for the given element and stable phase to the output dictionary
+                    # Then save mole fraction of element by phase for the given
+                    # element and stable phase to the output dictionary
                     if element in list(state[phase_type][stable_phase]['elements'].keys()):
                         mole_frac_element_by_phase[element][state_index]\
                             .append( \
@@ -171,8 +172,13 @@ class pseudoBinaryDiagram(thermoOut):
         self.left_endmember = left_endmember_composition
         self.right_endmember = right_endmember_composition
 
+        # Get mass labels for plotting
+        left_endmember_masses = component_fractions_to_element_fractions(left_endmember_composition, self.elements)
+        right_endmember_masses = component_fractions_to_element_fractions(right_endmember_composition, self.elements)
+        self.mass_labels = get_mass_labels(left_endmember_masses, right_endmember_masses, self.elements)
+
         # Now add a new attribute that is a dictionary of the mole fraction of right endmember and state
-        self.mol_frac_right_endmemebr = {\
+        self.mol_frac_right_endmember = {\
             state_key: \
                 element_to_component_fractions_pseudo_binary(\
                     left_endmember_composition, right_endmember_composition, \
@@ -207,14 +213,42 @@ class pseudoBinaryDiagram(thermoOut):
             phases_key = frozenset(phase_names)
 
             if phases_key in self.regions:
-                self.regions[phases_key].append( ( self.mol_frac_right_endmemebr[state_key], self.temperatures[state_key] ) )
+                self.regions[phases_key].append( ( self.mol_frac_right_endmember[state_key], self.temperatures[state_key] ) )
             else:
-                self.regions.update({phases_key: [(self.mol_frac_right_endmemebr[state_key], self.temperatures[state_key])]})
+                self.regions.update({phases_key: [(self.mol_frac_right_endmember[state_key], self.temperatures[state_key])]})
 
 
+    def plot_phase_regions(self, plot_marker='.'):
+        # Initialize the phase_region_plot attribute
+        self.phase_region_plot = plotObject()
+        self.phase_region_plot.fig = None
+        self.phase_region_plot.ax = None
 
-    # def plot_phase_boundaries(self):
+        self.phase_region_plot.fig, self.phase_region_plot.ax = plt.subplots()
 
+        color = iter(plt.cm.rainbow(np.linspace(0, 1, len(self.regions.keys()))))
+        for phase_names, phase_region in self.regions.items():
+            c = next(color)
+
+            x_points = [ phase_point[0] for phase_point in phase_region ]
+            y_points = [ phase_point[1] for phase_point in phase_region ]
+
+            self.phase_region_plot.ax.plot(x_points, y_points, plot_marker, c=c, label = '+'.join(phase_names))
+
+        self.phase_region_plot.ax.set_xlim(0,1)
+        title = " $-$ ".join(self.mass_labels)
+        self.phase_region_plot.ax.set_title(r'{0} phase diagram'.format(title))
+        self.phase_region_plot.ax.set_xlabel(r'Mole fraction {0}'.format(self.mass_labels[1]))
+        self.phase_region_plot.ax.set_ylabel("Temperature [K]")
+        self.phase_region_plot.ax.legend(loc='upper right', bbox_to_anchor=(1.5, 1))
+
+        plt.show()
+
+
+class plotObject:
+    """An empty class for holding phase region plots"""
+    def __init__(self) -> None:
+        pass
 
 # ---------------------------------
 #       Auxillary Functions
