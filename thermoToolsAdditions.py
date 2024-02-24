@@ -7,6 +7,7 @@ import copy
 import pseudoBinaryPhaseDiagramFunctions as pbpd
 import matplotlib.pyplot as plt
 import math
+from scipy.spatial import ConvexHull
 
 """This is a module containing all of the supporting classes and functions for running the calculations needed for my Senior Deisgn
 project. This module extends the built-in thermochimica module `thermoTools`, and contains a function for automatically executing a
@@ -215,7 +216,65 @@ class pseudoBinaryDiagram(thermoOut):
             if phases_key in self.regions:
                 self.regions[phases_key].append( ( self.mol_frac_right_endmember[state_key], self.temperatures[state_key] ) )
             else:
-                self.regions.update({phases_key: [(self.mol_frac_right_endmember[state_key], self.temperatures[state_key])]})
+                self.regions.update({phases_key: [(self.mol_frac_right_endmember[state_key], self.temperatures[state_key])] })
+
+        # Now convert to numpy arrays
+        self.regions = {key: np.array(region) for key, region in self.regions.items()}
+
+
+    def _filter_phase_points(self, threshold=0.1):
+        """This function serves to eliminate points in phase regions that are far from the centroid of the rest of the points - which
+        in general are the result of roundoff errors and numerical uncertainties, and can ruin our plots"""
+
+        # We want to decrease the area of this convex hull (by excluding outliers) until the fractional decrease in area is less than a certain
+        # threshold. Note this process filters out outliers because excluding them results in a large fractional area decrease of the convex hull
+
+        def fractional_area_decrease(points, hull, point):
+            """Calculate the fractional decrease in area of the convex hull by excluding a point."""
+            original_area = hull.volume
+            mask = np.any(points != point, axis=1)
+            reduced_hull = ConvexHull(points[mask])
+            reduced_area = reduced_hull.volume
+            return (original_area - reduced_area) / original_area
+
+        for region_key, points in self.regions.items():
+            # Compute the convex hull of the points in a given phase region. NOTE the convex hull of a set of points is the smallest polygon that
+            # contains all of the points
+
+            if points.shape[0] < 4:
+                # Cannot make a convex hull with less than 3 points, and cannot remove a point (and still calculate area) without 4 points
+                continue
+
+            hull = ConvexHull(points)
+            filtered_points = points.copy()
+
+            # We iterate over the boundary of the convex hull, and see which point (upon exclusion) results in the maximal decrease in the convex hull
+            # area, then exclude this point and repeat until the fractional decrease is less than a threshold
+
+            while True:
+                boundary_vertices = filtered_points[hull.vertices]
+                fractional_area_decreases= []
+                for boundary_vertex in boundary_vertices:
+                    fractional_area_decreases.append((boundary_vertex, fractional_area_decrease(filtered_points, hull, boundary_vertex)))
+
+                # Find point that maximizes the fractional area decrease
+                max_point, max_decrease = max(fractional_area_decreases, key=lambda x: x[1])
+                if max_decrease < threshold:
+                    break
+
+                # Now filter out point
+                mask = np.any(filtered_points != max_point, axis=1)
+                filtered_points = filtered_points[mask]
+
+                # Now create a new convex hull
+                if filtered_points.shape[0] > 3:
+                    hull = ConvexHull(filtered_points)
+                else:
+                    # Cannot calculate the area of a convex hull with two points
+                    break
+               
+            # Now overwrite region points with filtered points
+            self.regions[region_key] = filtered_points
 
 
     def plot_phase_regions(self, plot_marker='.'):
@@ -230,8 +289,8 @@ class pseudoBinaryDiagram(thermoOut):
         for phase_names, phase_region in self.regions.items():
             c = next(color)
 
-            x_points = [ phase_point[0] for phase_point in phase_region ]
-            y_points = [ phase_point[1] for phase_point in phase_region ]
+            x_points = phase_region[:, 0]
+            y_points = phase_region[:, 1]
 
             self.phase_region_plot.ax.plot(x_points, y_points, plot_marker, c=c, label = '+'.join(phase_names))
 
