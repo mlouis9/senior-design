@@ -168,7 +168,22 @@ class thermoOut:
 
 class pseudoBinaryDiagram(thermoOut):
     """A class which extends thermoOut for use in making pseudo binary phase diagrams"""
-    def __init__(self, left_endmember_composition: dict, right_endmember_composition: dict, out_file: Path = None):
+    def __init__(self, left_endmember_composition: dict, right_endmember_composition: dict, out_file: Path = None, plot_everything: bool = False):
+        """Initializes a pseudo binary phase diagram object from a given thermochimica output file
+        
+        Parameters:
+        -----------
+            plot_everything: A boolean argument that causes every phase region to be plotted. By default, only those with phases = number of elements - 1
+                             are plotted, as those are important for determining the speciation of solid phases.
+        
+        Returns:
+        --------
+            None
+        """
+
+        # Plotting options
+        self.plot_everything = plot_everything
+
         # First create a thermoOut object with the output file
         super().__init__(out_file)
         self.left_endmember = left_endmember_composition
@@ -191,11 +206,7 @@ class pseudoBinaryDiagram(thermoOut):
         # Now get regions
         self._get_phase_regions()
 
-    # def _get_boundary_points(self):
-    #     # Assuming a common carrier element (e.g. Cl or F), the number of components that determine the number of degrees of freedom is given
-    #     # by the number of elements -1 (the carrier), thus the phase boundaries occur when F = 1 = 2 + C - P ==> P = 1 + C = number of elements
 
-    #     self.phase_boundaries = [ phases for phases in self.stable_phases if len(phases) == len(self.elements)]
     def _get_phase_regions(self):
         """Function for getting the unique phase regions for each set of stable phases, these will partition the composition/temperature space
         into regions, after which we can find the boundaries"""
@@ -204,7 +215,8 @@ class pseudoBinaryDiagram(thermoOut):
         # by the number of elements -1 (the carrier), thus the phase boundaries occur when F = 1 = 2 + C - P ==> P = 1 + C = number of elements.
         # So the regions with two degrees of freedom (areas on the phase diagram) are those for which P = number of elements - 1
 
-        region_points = { state_key: phases for state_key, phases in self.stable_phases.items() if len(phases) == len(self.elements) - 1 }
+        region_points = { state_key: phases for state_key, phases in self.stable_phases.items() \
+                         if (len(phases) == len(self.elements) - 1) or self.plot_everything}
         self.regions = dict()
 
         for state_key, phases in region_points.items():
@@ -251,8 +263,11 @@ class pseudoBinaryDiagram(thermoOut):
                 # regions are generally the result of roundoff (being so small) so we exclude them
                 exclusions[region_key] = True
                 continue
-
-            hull = ConvexHull(points)
+            
+            try:
+                hull = ConvexHull(points)
+            except scipy.spatial.qhull.QhullError:
+                continue
             filtered_points = points.copy()
 
             # We iterate over the boundary of the convex hull, and see which point (upon exclusion) results in the maximal decrease in the convex hull
@@ -324,10 +339,12 @@ class pseudoBinaryDiagram(thermoOut):
         for phase_names, phase_region in self.regions.items():
             c = next(color)
 
-            labels = []
             if plot_mode == 'boundary' and phase_region.shape[0] >= 3:
                 # Plot only the boundary
-                hull = ConvexHull(phase_region)
+                try:
+                    hull = ConvexHull(phase_region)
+                except scipy.spatial.qhull.QhullError:
+                    continue
                 points = phase_region[hull.vertices]
 
                 # Now add an additional copy of the first point to close the boundary
@@ -677,10 +694,10 @@ def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, outpu
     mint = tlo + tshift
     maxt = thi + tshift
 
-    calc = pbpd.diagram(data_file, active=True, interactivePlot=True, inputFileName="runThermochimica.ti", \
+    calc = pbpd.diagram(data_file, active=True, interactivePlot=True, inputFileName=input_file_name, \
                     outputFileName=str(output_path / output_name), thermochimicaPath=thermochimica_path)
 
     calc.initRun(press, tunit, punit, plane, sum1, sum2, mint, maxt, elements_used, mass_labels, munit, tshift, fuzzy=fuzzy)
     calc.runCalc(xlo, xhi, nxstep, tlo, thi, ntstep)
-    calc.processPhaseDiagramData()
+    # calc.processPhaseDiagramData()
     return calc
