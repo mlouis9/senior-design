@@ -11,8 +11,8 @@ from scipy.spatial import ConvexHull
 import scipy
 
 """This is a module containing all of the supporting classes and functions for running the calculations needed for my Senior Deisgn
-project. This module extends the built-in thermochimica module `thermoTools`, and contains a function for automatically executing a
-solubility calculation, and easily reading output.
+project. This module extends the built-in thermochimica modules 'thermoTools' and 'pseudoBinaryPhaseDiagramFunctions', and contains 
+a function for automatically executing a solubility calculation, and easily reading output.
 
 Author: Matthew Louis
 Email:" matthewlouis31@gmail.com
@@ -312,7 +312,7 @@ class pseudoBinaryDiagram(thermoOut):
             if exclude:
                 self.regions.pop(region_key)
 
-    def plot_phase_regions(self, plot_mode='boundary',plot_marker='.'):
+    def plot_phase_regions(self, plot_mode='boundary',plot_marker='.', filter_threshold=0.1):
         """Function for plotting phase boundaries
         
         Parameters:
@@ -326,7 +326,7 @@ class pseudoBinaryDiagram(thermoOut):
         """
 
         # First filter the phase_points
-        self._filter_phase_points()
+        self._filter_phase_points(threshold=filter_threshold)
 
         # Initialize the phase_region_plot attribute
         self.plot = plotObject()
@@ -361,7 +361,7 @@ class pseudoBinaryDiagram(thermoOut):
         self.plot.ax.set_title(r'{0} phase diagram'.format(title))
         self.plot.ax.set_xlabel(r'Mole fraction {0}'.format(self.mass_labels[1]))
         self.plot.ax.set_ylabel("Temperature [K]")
-        self.plot.ax.legend(loc='upper right', bbox_to_anchor=(1.5, 1))
+        self.plot.ax.legend(loc='upper right', bbox_to_anchor=(2, 1))
 
         plt.show()
 
