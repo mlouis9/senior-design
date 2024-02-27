@@ -363,7 +363,82 @@ class pseudoBinaryDiagram(thermoOut):
         self.plot.ax.set_ylabel("Temperature [K]")
         self.plot.ax.legend(loc='upper right', bbox_to_anchor=(2, 1))
 
-        plt.show()
+        # plt.show()
+
+    def _find_extreme_points(self, convex_hull):
+        """Find the points on the convex hull with maximum and minimum y-values.
+        """
+        sorted_indices = np.argsort(convex_hull.points[:, 1])  # Sort indices by y-values
+        min_y_index = sorted_indices[0]
+        max_y_index = sorted_indices[-1]
+
+        min_y_point = convex_hull.points[min_y_index]
+        max_y_point = convex_hull.points[max_y_index]
+            
+        return min_y_point, max_y_point
+
+
+    def _intersection_with_horizontal_line(self, y_value, points, hull):
+        # First, find min_y and max_y for the given convex hull (phase region)
+        min_y_point, max_y_point = self._find_extreme_points(hull)
+        min_temp = min_y_point[1]
+        max_temp = max_y_point[1]
+
+        # Find intersection points
+        intersections = []
+        if (min_temp <= y_value) and (y_value <= max_temp):
+            for simplex in hull.simplices:
+                edge_start = points[simplex[0]]
+                edge_end = points[simplex[1]]
+            
+                # Check if the edge intersects with the horizontal line
+                if (edge_start[1] - y_value) * (edge_end[1] - y_value) <= 0:
+                    # Calculate the x-coordinate of the intersection point using linear interpolation
+                    t = (y_value - edge_start[1]) / (edge_end[1] - edge_start[1])
+                    intersection_x = edge_start[0] + t * (edge_end[0] - edge_start[0])
+                    intersections.append((intersection_x, y_value))
+        else:
+            if y_value < min_temp:
+                intersections.append((0,y_value)) # Assign solubility of 0
+            else: # (y_value > max_temp)
+                intersections.append((1,y_value)) # Assign solubility of 1
+
+        return np.array(intersections)
+
+
+    def calculate_solubility(self, insoluble_phase: frozenset, temperatures: np.ndarray):
+        """Utility for calculating solubility as a function of temperature
+        
+        Parameters:
+        -----------
+            insoluble_phase: A frozen set representing the phases in the insoluble phase
+            temps: A numpy array of temperatures at which to calculate solubilities
+
+        Returns:
+        --------
+            An array containing the solubility of the right endmember as a function of temperature
+        
+        """
+        insoluble_phase_region = self.regions[insoluble_phase]
+
+        try:
+            hull = ConvexHull(insoluble_phase_region)
+        except scipy.spatial.qhull.QhullError:
+            assert("Either phase region is not present, or has not been properly resolved, please run again with more composition steps, or try another\
+                   phase region")
+        
+
+        solubilities = np.zeros(len(temperatures))
+
+        for temp_index, temperature in enumerate(temperatures):
+            # Now calculate intersection of convex hull (represents the boundary of the insoluble phase region) with a given temperature abscissa
+            intersections = self._intersection_with_horizontal_line(temperature, insoluble_phase_region, hull)
+
+            # Now find the intersection with the smallest x-value (corresponding to the solubility limit)
+            min_x_index = np.argmin(intersections[:,0])
+            solubilities[temp_index] = intersections[min_x_index, 0] 
+
+        return solubilities
 
 
 class plotObject:
@@ -434,10 +509,7 @@ def element_to_component_fractions_pseudo_binary(left_endmember_composition, rig
         unique_elements += elements_from_component_key(key)
     unique_elements = list(set(unique_elements))
     left_endmember_element_composition = component_fractions_to_element_fractions(left_endmember_composition, unique_elements)
-    left_endmember_element_composition = list(left_endmember_element_composition / sum(left_endmember_element_composition))
-
     right_endmember_element_composition = component_fractions_to_element_fractions(right_endmember_composition, unique_elements)
-    right_endmember_element_composition = list(right_endmember_element_composition / sum(right_endmember_element_composition))
 
     # Now, find the element(s) in the right endmember that are not present in the left-endmember
     for index, _ in enumerate(unique_elements):
@@ -639,7 +711,7 @@ def solubility_calculation(temp: float, press: float, unit_ratio_of_other_compon
 def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, output_name: str, data_file: Path, xlo: float, xhi: float, nxstep: int, \
                               tlo: float, thi: float, ntstep: int, elements_used: list, left_endmember_composition: dict, \
                               right_endmember_composition: dict, press: float=1, tunit: str='K', punit: str='atm', munit: str='moles', \
-                              input_file_name: str='runThermochimica.ti', fuzzy: bool=True) -> pbpd.diagram:
+                              input_file_name: str='runThermochimica.ti', fuzzy: bool=True, thermochimica_plotting=False) -> pbpd.diagram:
     """Function for performing a pseudo binary calculation. This performs most of the tedious IO tasks, and properly converts from component compositions
     to element fractions, etc.
     
@@ -664,6 +736,9 @@ def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, outpu
         munit:
         input_file_name:
         fuzzy:
+        thermochimica_plotting: Whether or not the use is postprocessing the data with the thermochimica plotting script or not. NOTE, this will simply
+                                normalize the endmember fractions differently, which can be dangerous, because it will produce an output file that, if plotted
+                                with the plotting routines cointained in this package, will produce binary phase diagrams for the wrong system
     
     Returns:
     --------
@@ -678,9 +753,11 @@ def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, outpu
 
     mass_labels = get_mass_labels(left_endmember_masses, right_endmember_masses, elements_used)
 
-    # Now normalize left and right endmember masses, NOTE this is REQUIRED for the plotting and postprocessing to behave
-    left_endmember_masses = list( left_endmember_masses / sum1 )
-    right_endmember_masses = list( right_endmember_masses / sum2 )
+    # Now normalize left and right endmember masses, NOTE this is REQUIRED for the built-in (to thermochimica) plotting and postprocessing to behave
+    if thermochimica_plotting:
+        # This is dangerous, as noted in the docstring
+        left_endmember_masses = list( left_endmember_masses / sum1 )
+        right_endmember_masses = list( right_endmember_masses / sum2 )
 
     plane = [left_endmember_masses, right_endmember_masses]
 
