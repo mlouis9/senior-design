@@ -268,7 +268,7 @@ class pseudoBinaryDiagram(thermoOut):
                 hull = ConvexHull(points)
             except scipy.spatial.qhull.QhullError:
                 continue
-            filtered_points = points.copy()
+            filtered_points = points
 
             # We iterate over the boundary of the convex hull, and see which point (upon exclusion) results in the maximal decrease in the convex hull
             # area, then exclude this point and repeat until the fractional decrease is less than a threshold
@@ -283,7 +283,7 @@ class pseudoBinaryDiagram(thermoOut):
                         # These types of errors are generally due to flat polygons
                         # Not any express reason to exclude these regions at the moment
                         # exclusions[region_key] = True
-                        break
+                        continue
 
                 # Find point that maximizes the fractional area decrease
                 max_point, max_decrease = max(fractional_area_decreases, key=lambda x: x[1])
