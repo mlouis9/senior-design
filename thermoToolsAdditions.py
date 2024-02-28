@@ -259,7 +259,7 @@ class pseudoBinaryDiagram(thermoOut):
 
         if (self.ntstep != 1) and (self.nxstep != 1):
             minstep = min(self.ntstep, self.nxstep)
-            self._filter_low_density_regions(10*minstep, int(minstep**2/100))
+            self._filter_low_density_regions(30*minstep, int(minstep**2/300))
 
     def _filter_phase_points(self, threshold=0.1):
         """This function serves to eliminate points in phase regions that are far from the centroid of the rest of the points - which
@@ -470,6 +470,9 @@ class pseudoBinaryDiagram(thermoOut):
 
                 # Now scale back to normal temperature range
                 points[:,1] = points[:,1]*(self.max_t - self.min_t) + self.min_t
+
+                # Also, since we directly scaled the original phase region, we must also scale it back
+                phase_region[:,1] = phase_region[:,1]*(self.max_t - self.min_t) + self.min_t
             else:
                 points = phase_region
             x_points = points[:, 0]
@@ -541,6 +544,7 @@ class pseudoBinaryDiagram(thermoOut):
         
         """
         insoluble_phase_region = self.regions[insoluble_phase]
+        print(insoluble_phase_region)
 
         try:
             hull = ConvexHull(insoluble_phase_region)
