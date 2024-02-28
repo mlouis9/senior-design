@@ -12,8 +12,10 @@ import scipy
 from shapely import Polygon
 import alphashape
 import warnings
+from sklearn.cluster import DBSCAN
 
-warnings.filterwarnings('error')
+# warnings.filterwarnings('error')
+warnings.filterwarnings("ignore", message="the matrix subclass is not the recommended way to represent matrices or deal with linear algebra (see https://docs.scipy.org/doc/numpy/user/numpy-for-matlab-users.html). Please adjust your code to use regular ndarray.")
 
 """This is a module containing all of the supporting classes and functions for running the calculations needed for my Senior Deisgn
 project. This module extends the built-in thermochimica modules 'thermoTools' and 'pseudoBinaryPhaseDiagramFunctions', and contains 
@@ -216,8 +218,10 @@ class pseudoBinaryDiagram(thermoOut):
 
         # Now calculate temperature delta
         temperatures = np.array(list(self.temperatures.values()))
-        self.delta_t = np.max(temperatures) - np.min(temperatures)
-        print(self.delta_t)
+        self.min_t = np.min(temperatures)
+        self.max_t = np.max(temperatures)
+        self.delta_t = self.max_t - self.min_t
+        
 
         # Now get regions
         self._get_phase_regions()
@@ -250,6 +254,14 @@ class pseudoBinaryDiagram(thermoOut):
         # Now convert to numpy arrays
         self.regions = {key: np.array(region) for key, region in self.regions.items()}
 
+        # First filter the phase_points
+
+        # Filtering based on the ConvexHull is no longer necessary
+        # self._filter_phase_points(threshold=0.1)
+
+        if (self.ntstep != 1) and (self.nxstep != 1):
+            minstep = min(self.ntstep, self.nxstep)
+            self._filter_low_density_regions(5*minstep, int(minstep**2/50))
 
     def _filter_phase_points(self, threshold=0.1):
         """This function serves to eliminate points in phase regions that are far from the centroid of the rest of the points - which
@@ -328,7 +340,56 @@ class pseudoBinaryDiagram(thermoOut):
             if exclude:
                 self.regions.pop(region_key)
 
-    def plot_phase_regions(self, plot_mode='boundary',plot_marker='.', filter_threshold=0.1):
+
+    def _filter_low_density_regions(self, epsilon, min_samples):
+        """
+        Filter out regions with a low density of points using DBSCAN clustering.
+        
+        Parameters:
+            points (ndarray): Array of shape (n, 2) containing the coordinates of points.
+            epsilon (float): The maximum distance between two samples for one to be considered as in the neighborhood of the other.
+            min_samples (int): The number of samples (or total weight) in a neighborhood for a point to be considered as a core point.
+            min_density (int): The minimum density required to keep a cluster.
+            
+        Returns:
+            ndarray: Filtered points.
+        """
+        # Dictionary that keeps track of any phases that are being excluded entirely
+        exclusions = {region_key: False for region_key in self.regions.keys()}
+
+        for region_key, points in self.regions.items():
+
+            # Normalize filtered_poitns by temperature
+            points_copy = np.copy(points)
+            points_copy[:, 1] = (points[:,1] - self.min_t)/(self.max_t - self.min_t)
+
+            # Perform DBSCAN clustering
+            dbscan = DBSCAN(eps=epsilon, min_samples=min_samples).fit(points_copy)
+            
+            # Compute density of each cluster
+            unique_labels, cluster_counts = np.unique(dbscan.labels_, return_counts=True)
+            cluster_density = {label: count for label, count in zip(unique_labels, cluster_counts)}
+            if len(cluster_density) == 1 and list(cluster_density.keys())[0] != -1:
+                filtered_points = []
+                for _, point in zip(dbscan.labels_, points_copy):
+                    filtered_points.append(point)
+
+                if len(filtered_points) != 0:
+                    filtered_points = np.array(filtered_points)
+
+                    self.regions[region_key][:,1] = filtered_points[:,1]*(self.max_t - self.min_t) + self.min_t
+                else:
+                    exclusions[region_key] = True
+            else:
+                exclusions[region_key] = True
+
+        # Now exclude regions
+        for region_key, exclude in exclusions.items():
+            if exclude:
+                self.regions.pop(region_key)
+
+
+    def plot_phase_regions(self, plot_mode='boundary',plot_marker='.'):
         """Function for plotting phase boundaries
         
         Parameters:
@@ -340,9 +401,6 @@ class pseudoBinaryDiagram(thermoOut):
         --------
             None
         """
-
-        # First filter the phase_points
-        self._filter_phase_points(threshold=filter_threshold)
 
         # Initialize the phase_region_plot attribute
         self.plot = plotObject()
@@ -359,26 +417,35 @@ class pseudoBinaryDiagram(thermoOut):
                 # Plot only the boundary
 
                 # First, rescale the y-axis to 1 so that we can easily choose an intelligent alpha value for the alphashape
-                phase_region[:,1] = phase_region[:, 1]/self.delta_t
-                alpha = 0.5/max(1/self.ntstep, 1/self.nxstep)
-                print(alpha)
+                phase_region[:,1] = (phase_region[:,1] - self.min_t)/(self.max_t - self.min_t)
                 try:
-                    boundary = alphashape.alphashape(phase_region, alpha)
-                    points = []
-                    if isinstance(boundary, Polygon):
-                        points.extend(list(boundary.exterior.coords))
-                    else:
-                        for geometry in boundary.geoms:
-                            # Extract the boundary of the geometry
-                            boundary = geometry.boundary
-                            # Check if the boundary is a LineString or MultiLineString
-                            if boundary.geom_type == 'LineString':
-                                # Extract the coordinates of the LineString
-                                points.extend(list(boundary.coords))
-                            elif boundary.geom_type == 'MultiLineString':
-                                # Extract the coordinates of each LineString in the MultiLineString
-                                for line in boundary:
-                                    points.extend(list(line.coords))
+                    alpha = 0.5/max(1/self.ntstep, 1/self.nxstep)
+
+                    number_of_attempts = 0
+                    max_attempts = 3
+                    while number_of_attempts < max_attempts:
+                        boundary = alphashape.alphashape(phase_region, alpha)
+                        points = []
+                        if isinstance(boundary, Polygon):
+                            points.extend(list(boundary.exterior.coords))
+                        else: # Disjoint boundary
+                            for geometry in boundary.geoms:
+                                if number_of_attempts == max_attempts - 1: # No more tries to get alpha right
+                                    # Extract the boundary of the geometry
+                                    boundary = geometry.boundary
+                                    # Check if the boundary is a LineString or MultiLineString
+                                    if boundary.geom_type == 'LineString':
+                                        # Extract the coordinates of the LineString
+                                        points.extend(list(boundary.coords))
+                                    elif boundary.geom_type == 'MultiLineString':
+                                        # Extract the coordinates of each LineString in the MultiLineString
+                                        for line in boundary:
+                                            points.extend(list(line.coords))
+                                else:
+                                    alpha = 0.9*alpha
+                        number_of_attempts += 1
+                                
+                                        
                 except Warning: # Catch any alphashape root warnings (that result in terrible boundary plots)
                     try:
                         points = phase_region[ConvexHull(phase_region).vertices]
@@ -391,10 +458,10 @@ class pseudoBinaryDiagram(thermoOut):
                     continue
 
                 # Now add an additional copy of the first point to close the boundary
-                points = np.append(points, [points[0]], axis=0)
+                # points = np.append(points, [points[0]], axis=0)
 
                 # Now scale back to normal temperature range
-                points[:,1] = points[:,1]*self.delta_t
+                points[:,1] = points[:,1]*(self.max_t - self.min_t) + self.min_t
             else:
                 points = phase_region
             x_points = points[:, 0]
@@ -407,7 +474,7 @@ class pseudoBinaryDiagram(thermoOut):
         self.plot.ax.set_title(r'{0} phase diagram'.format(title))
         self.plot.ax.set_xlabel(r'Mole fraction {0}'.format(self.mass_labels[1]))
         self.plot.ax.set_ylabel("Temperature [K]")
-        self.plot.ax.legend(loc='upper right', bbox_to_anchor=(2, 1))
+        self.plot.ax.legend(loc='upper left', bbox_to_anchor=(1.01, 1))
 
         # plt.show()
 
