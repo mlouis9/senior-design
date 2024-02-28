@@ -14,6 +14,7 @@ import alphashape
 from sklearn.cluster import DBSCAN
 from io import StringIO
 import sys
+from thermo.mixture import Mixture
 
 """This is a module containing all of the supporting classes and functions for running the calculations needed for my Senior Deisgn
 project. This module extends the built-in thermochimica modules 'thermoTools' and 'pseudoBinaryPhaseDiagramFunctions', and contains 
@@ -115,6 +116,9 @@ class thermoOut:
                         if phase[0] in self.output[state]['solution phases'].keys():
                             soln_frac_element += phase[1]
                     self.solution_fraction_element[element].update({state: soln_frac_element})
+
+            # Store atomic weights of elements (for convenience)
+            self.atomic_weights = {element: Mixture([element]).MW for element in self.elements}
 
         else:
             self.temperatures = dict()
