@@ -97,11 +97,17 @@ class thermoOut:
                                                                                    # fractions to output.json, though they should still
                                                                                    # be included for our purposes
             self.stable_phases = self._get_stable_phases()
+            self.stable_solution_phases = {state: [ phase_tuple for phase_tuple in phase_list if phase_tuple[0] in self.output[state]['solution phases'].keys()] \
+                                            for state, phase_list in self.stable_phases.items() }
+            self.stable_condensed_phases = {state: [ phase_tuple for phase_tuple in phase_list if phase_tuple[0] in self.output[state]['pure condensed phases'].keys()] \
+                                            for state, phase_list in self.stable_phases.items() }
             self.mole_fraction_element_by_phase = self._get_mole_fraction_element_by_phase()
 
         else:
             self.temperatures = dict()
             self.stable_phases = dict()
+            self.stable_solution_phases = dict()
+            self.stable_condensed_phases = dict()
             self.mole_fraction_element_by_phase = {}
             self.elements = []
 
