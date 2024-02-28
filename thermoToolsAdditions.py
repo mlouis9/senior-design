@@ -432,7 +432,6 @@ class pseudoBinaryDiagram(thermoOut):
                         # If there is a singular matrix warning, error
                         output = sys.stderr.getvalue()
                         sys.stderr = sys.__stderr__
-                        print(f"OUTPUT {output}")
                         assert "WARNING:root:Singular matrix. Likely caused by all points lying in an N-1 space." not in output
 
                         points = []
