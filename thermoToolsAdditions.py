@@ -14,8 +14,8 @@ import alphashape
 import warnings
 from sklearn.cluster import DBSCAN
 
-# warnings.filterwarnings('error')
 warnings.filterwarnings("ignore", message="the matrix subclass is not the recommended way to represent matrices or deal with linear algebra (see https://docs.scipy.org/doc/numpy/user/numpy-for-matlab-users.html). Please adjust your code to use regular ndarray.")
+warnings.filterwarnings('error')
 
 """This is a module containing all of the supporting classes and functions for running the calculations needed for my Senior Deisgn
 project. This module extends the built-in thermochimica modules 'thermoTools' and 'pseudoBinaryPhaseDiagramFunctions', and contains 
@@ -261,7 +261,7 @@ class pseudoBinaryDiagram(thermoOut):
 
         if (self.ntstep != 1) and (self.nxstep != 1):
             minstep = min(self.ntstep, self.nxstep)
-            self._filter_low_density_regions(5*minstep, int(minstep**2/50))
+            self._filter_low_density_regions(10*minstep, int(minstep**2/100))
 
     def _filter_phase_points(self, threshold=0.1):
         """This function serves to eliminate points in phase regions that are far from the centroid of the rest of the points - which
@@ -446,19 +446,19 @@ class pseudoBinaryDiagram(thermoOut):
                         number_of_attempts += 1
                                 
                                         
-                except Warning: # Catch any alphashape root warnings (that result in terrible boundary plots)
-                    try:
-                        points = phase_region[ConvexHull(phase_region).vertices]
-                    except:
-                        continue
+                except Warning as warning: # Catch any alphashape root warnings (that result in terrible boundary plots)
+                    if warning != "the matrix subclass is not the recommended way to represent matrices or deal with linear algebra (see https://docs.scipy.org/doc/numpy/user/numpy-for-matlab-users.html). Please adjust your code to use regular ndarray.":
+                        try:
+                            points = phase_region[ConvexHull(phase_region).vertices]
+                            # Now add an additional copy of the first point to close the boundary
+                            points = np.append(points, [points[0]], axis=0)
+                        except:
+                            continue
                 
                 points = np.array(points)
                 if len(points) == 0:
                     # Empty boundary
                     continue
-
-                # Now add an additional copy of the first point to close the boundary
-                # points = np.append(points, [points[0]], axis=0)
 
                 # Now scale back to normal temperature range
                 points[:,1] = points[:,1]*(self.max_t - self.min_t) + self.min_t
