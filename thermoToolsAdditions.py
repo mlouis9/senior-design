@@ -432,6 +432,7 @@ class pseudoBinaryDiagram(thermoOut):
                         # If there is a singular matrix warning, error
                         output = sys.stderr.getvalue()
                         sys.stderr = sys.__stderr__
+                        print(f"OUTPUT {output}")
                         assert "WARNING:root:Singular matrix. Likely caused by all points lying in an N-1 space." not in output
 
                         points = []
@@ -453,9 +454,12 @@ class pseudoBinaryDiagram(thermoOut):
                                 else:
                                     alpha = 0.9*alpha
                         number_of_attempts += 1
+
+                        # Check that boundary is not empty!
+                        assert len(points) != 0 # If zero, throw an exception and try to make a convex hull instead
                                 
                                         
-                except : # Catch any alphashape root warnings (that result in terrible boundary plots)
+                except: # Catch any alphashape root warnings (that result in terrible boundary plots)
                     try:
                         points = phase_region[ConvexHull(phase_region).vertices]
                         # Now add an additional copy of the first point to close the boundary
@@ -544,7 +548,6 @@ class pseudoBinaryDiagram(thermoOut):
         
         """
         insoluble_phase_region = self.regions[insoluble_phase]
-        print(insoluble_phase_region)
 
         try:
             hull = ConvexHull(insoluble_phase_region)
