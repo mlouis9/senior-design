@@ -103,12 +103,26 @@ class thermoOut:
                                             for state, phase_list in self.stable_phases.items() }
             self.mole_fraction_element_by_phase = self._get_mole_fraction_element_by_phase()
 
+            # For each element, get fraction in solution phase (useful for corrosion calculations)
+            self.solution_fraction_element = {element: dict() for element in self.elements}
+            for element in self.elements:
+                phases_by_element = self.mole_fraction_element_by_phase[element]
+                for state, phases in phases_by_element.items():
+                    soln_frac_element = 0.0
+                    # Now iterate over all of the phases and accumulate the fraction that are in a solution phase
+                    for phase in phases:
+                        # If its a solution phase
+                        if phase[0] in self.output[state]['solution phases'].keys():
+                            soln_frac_element += phase[1]
+                    self.solution_fraction_element[element].update({state: soln_frac_element})
+
         else:
             self.temperatures = dict()
             self.stable_phases = dict()
             self.stable_solution_phases = dict()
             self.stable_condensed_phases = dict()
             self.mole_fraction_element_by_phase = {}
+            self.solution_fraction_element = dict()
             self.elements = []
 
     def add_output(self, out_file):
