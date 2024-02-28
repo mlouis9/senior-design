@@ -9,6 +9,11 @@ import matplotlib.pyplot as plt
 import math
 from scipy.spatial import ConvexHull
 import scipy
+from shapely import Polygon
+import alphashape
+import warnings
+
+warnings.filterwarnings('error')
 
 """This is a module containing all of the supporting classes and functions for running the calculations needed for my Senior Deisgn
 project. This module extends the built-in thermochimica modules 'thermoTools' and 'pseudoBinaryPhaseDiagramFunctions', and contains 
@@ -168,13 +173,16 @@ class thermoOut:
 
 class pseudoBinaryDiagram(thermoOut):
     """A class which extends thermoOut for use in making pseudo binary phase diagrams"""
-    def __init__(self, left_endmember_composition: dict, right_endmember_composition: dict, out_file: Path = None, plot_everything: bool = False):
+    def __init__(self, left_endmember_composition: dict, right_endmember_composition: dict, out_file: Path = None, plot_everything: bool = False, \
+                 ntstep=1, nxstep=1):
         """Initializes a pseudo binary phase diagram object from a given thermochimica output file
         
         Parameters:
         -----------
             plot_everything: A boolean argument that causes every phase region to be plotted. By default, only those with phases = number of elements - 1
                              are plotted, as those are important for determining the speciation of solid phases.
+            ntstep: Used for determining the optimal alpha parameter for calculating the boundaries of the regions
+            nxstep: ^
         
         Returns:
         --------
@@ -203,6 +211,14 @@ class pseudoBinaryDiagram(thermoOut):
                                                                 )\
                                           for state_key, _ in self.output.items() }
         
+        self.ntstep = ntstep
+        self.nxstep = nxstep
+
+        # Now calculate temperature delta
+        temperatures = np.array(list(self.temperatures.values()))
+        self.delta_t = np.max(temperatures) - np.min(temperatures)
+        print(self.delta_t)
+
         # Now get regions
         self._get_phase_regions()
 
@@ -266,7 +282,7 @@ class pseudoBinaryDiagram(thermoOut):
             
             try:
                 hull = ConvexHull(points)
-            except scipy.spatial.qhull.QhullError:
+            except scipy.spatial.QhullError:
                 continue
             filtered_points = points
 
@@ -279,7 +295,7 @@ class pseudoBinaryDiagram(thermoOut):
                 for boundary_vertex in boundary_vertices:
                     try:
                         fractional_area_decreases.append((boundary_vertex, fractional_area_decrease(filtered_points, hull, boundary_vertex)))
-                    except scipy.spatial.qhull.QhullError:
+                    except scipy.spatial.QhullError:
                         # These types of errors are generally due to flat polygons
                         # Not any express reason to exclude these regions at the moment
                         # exclusions[region_key] = True
@@ -341,14 +357,44 @@ class pseudoBinaryDiagram(thermoOut):
 
             if plot_mode == 'boundary' and phase_region.shape[0] >= 3:
                 # Plot only the boundary
+
+                # First, rescale the y-axis to 1 so that we can easily choose an intelligent alpha value for the alphashape
+                phase_region[:,1] = phase_region[:, 1]/self.delta_t
+                alpha = 0.5/max(1/self.ntstep, 1/self.nxstep)
+                print(alpha)
                 try:
-                    hull = ConvexHull(phase_region)
-                except scipy.spatial.qhull.QhullError:
+                    boundary = alphashape.alphashape(phase_region, alpha)
+                    points = []
+                    if isinstance(boundary, Polygon):
+                        points.extend(list(boundary.exterior.coords))
+                    else:
+                        for geometry in boundary.geoms:
+                            # Extract the boundary of the geometry
+                            boundary = geometry.boundary
+                            # Check if the boundary is a LineString or MultiLineString
+                            if boundary.geom_type == 'LineString':
+                                # Extract the coordinates of the LineString
+                                points.extend(list(boundary.coords))
+                            elif boundary.geom_type == 'MultiLineString':
+                                # Extract the coordinates of each LineString in the MultiLineString
+                                for line in boundary:
+                                    points.extend(list(line.coords))
+                except Warning: # Catch any alphashape root warnings (that result in terrible boundary plots)
+                    try:
+                        points = phase_region[ConvexHull(phase_region).vertices]
+                    except:
+                        continue
+                
+                points = np.array(points)
+                if len(points) == 0:
+                    # Empty boundary
                     continue
-                points = phase_region[hull.vertices]
 
                 # Now add an additional copy of the first point to close the boundary
-                points = np.append(points, [phase_region[hull.vertices[0]]], axis=0)
+                points = np.append(points, [points[0]], axis=0)
+
+                # Now scale back to normal temperature range
+                points[:,1] = points[:,1]*self.delta_t
             else:
                 points = phase_region
             x_points = points[:, 0]
@@ -423,7 +469,7 @@ class pseudoBinaryDiagram(thermoOut):
 
         try:
             hull = ConvexHull(insoluble_phase_region)
-        except scipy.spatial.qhull.QhullError:
+        except scipy.spatialError:
             assert("Either phase region is not present, or has not been properly resolved, please run again with more composition steps, or try another\
                    phase region")
         
