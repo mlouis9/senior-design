@@ -3,3 +3,7 @@ This directory contains all of the calculations relevant to fuel/coolant salt op
 
 ## Table of Contents
 
+- [corrosionCalcs](corrosionCalcs/README.md)
+- [outputs](outputs/README.md)
+- [benchmarking](benchmarking/README.md)
+
