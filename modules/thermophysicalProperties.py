@@ -1,6 +1,6 @@
 import csv
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Callable
 from io import StringIO
 from frozendict import frozendict
 import warnings
@@ -37,7 +37,33 @@ class Database:
                     composition_dict = self._parse_composition(row)
                     parsed_row = self._parse_row(row)
                     data.update({composition_dict: parsed_row})
+                # Now, for each of the thermophysical properties with expansion functions, replace the array with a function
             return data
+        
+        def _make_thermo_function(self, salt: dict, key: str, tmin: float=None, tmax: float=None) -> Callable(float):
+            """A function that replaces each thermophysical property with a function that returns that thermophysical
+            property (in SI units) as a function of temperature
+            
+            Parameters:
+            -----------
+                salt: The salt whose thermophysical property at the given key is being calculated 
+                key: A string corresponding to the thermophysical property of interest
+                tmin: The minimum applicable temperature (the ouput function will issuue a warning if below this temperature)
+                tmax: The maximum applicable temperature                 ^                            above
+            
+            Returns:
+            --------
+                A function that takes the temperature (in K) and returns the thermophysical property corresponding to
+                the key
+            """
+            def thermo_function(T: float) -> float:
+                thermo_function.min_temp = tmin # May be None
+                thermo_function.max_temp = tmax # May be None
+                if thermo_function.min_temp != None and thermo_function.max_temp != None: # A valid applicable temperature range
+                    if not thermo_function.min_temp <= T <= thermo_function.max_temp:
+                        warnings.warn(f"Temperature {T} is out of the applicable range ({thermo_function.min_temp}, {thermo_function.max_temp}) for this property.", UserWarning)
+                thermo_function.coef_array = salt[key][0]
+                return self._outer._TP_FUNCTIONS[key](*thermo_function.coef_array, T)
         
         def _parse_mstdb_tp_rk(self, mstdb_tp_rk_path):
             """Function for parsing the .csv file containing the RK coefficients for the density expansion. Since this
@@ -333,4 +359,3 @@ mstdb_tp_rk_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Prope
 db = Database(mstdb_tp_path, mstdb_tp_rk_path)
 example_salt = frozendict({'AlCl3': 1.0})
 # print(db.data[example_salt])  # This will print the parsed data as a dictionary with frozendict keys
-print(db.data)
