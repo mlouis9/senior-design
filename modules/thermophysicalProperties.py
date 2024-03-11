@@ -9,7 +9,8 @@ additivity of molar volumes) and the RK expansion for estimating the effects non
 """
 
 class Database:
-    def __init__(self, mstdb_tp_path: Path, CSV_HEADERS: dict=None, CSV_VALUES: dict=None) -> None:
+    def __init__(self, mstdb_tp_path: Path, mstdb_tp_rk_path: Path, CSV_HEADERS: dict=None, CSV_VALUES: dict=None, \
+                 CSV_HEADERS_RK: dict=None) -> None:
         """Initializer for the Database class which stores a given version of the MSTDB TP and parses results from it"""
         if CSV_HEADERS == None:
             # Configuration for CSV headers
@@ -34,7 +35,23 @@ class Database:
             self._CSV_VALUES = {
                 'pure_salt': 'Pure Salt'
             }
+        if CSV_HEADERS_RK == None:
+            # Headers for the RK expansion coefficient file
+            self._CSV_HEADERS_RK = {
+                'component1': 'C1',
+                'component2': 'C2',
+                'a1': 'A1',
+                'b1': 'B1',
+                'a2': 'A2',
+                'b2': 'B2',
+                'a3': 'A3',
+                'b3': 'B3',
+                'tmin': 'T min',
+                'tmax': 'T max',
+                'reference': 'Reference'
+            }
         self.data = self._parse_mstdb_tp(mstdb_tp_path)
+        self.rk = self._parse_mstdb_tp_rk(mstdb_tp_rk_path)
 
     def _parse_mstdb_tp(self, mstdb_tp_path: Path) -> Dict:
         """Parse the MSTDB TP file and return the data as a dictionary with frozendict keys."""
@@ -50,6 +67,27 @@ class Database:
                 data.update({composition_dict: parsed_row})
         return data
     
+    def _parse_mstdb_tp_rk(self, mstdb_tp_rk_path):
+        """Function for parsing the .csv file containing the RK coefficients for the density expansion. Since this
+        csv does not have a subheader, its processing should be much easier"""
+        rk = dict()
+        print(mstdb_tp_rk_path)
+        with mstdb_tp_rk_path.open('r', errors='replace') as csvfile:
+            reader = csv.DictReader(csvfile, delimiter=',')
+            for row in reader:
+                salt_pair_key = frozenset({row[self._CSV_HEADERS_RK['component1']],\
+                                           row[self._CSV_HEADERS_RK['component2']]})
+                parsed_row = self._parse_row_rk(row)
+                rk.update( { salt_pair_key: parsed_row } )
+                
+        return rk
+    
+    def _parse_row_rk(self, row):
+        """Function for parsing rows of the MSTDB-TP RK csv"""
+        parsed_row = dict()
+
+        return parsed_row
+
     def _preprocess_subheader(self, reader, csvfile):
         """Function for correctly processing the subheaders in MSTDB-TP corresponding to the coefficients of the temperature
         dependence expansion of TP's"""
@@ -93,11 +131,9 @@ class Database:
                     reader[row_index-3][key_of_last_nonempty_col][0].append(append_val)
                 else:
                     if index_of_last_empty_col == col_index - 1:
-                        # Add temp range (a string) to the end of the list
-                        if col == '----' or col == '':
-                            append_val = None
-                        else:
-                            append_val = col
+                        # Add temp range to the end of the list
+                        append_val = self._parse_temp_range(col)
+                            
                         reader[row_index -3][key_of_last_nonempty_col][1] = append_val
 
                     key_of_last_nonempty_col = headers[col_index]
@@ -159,22 +195,59 @@ class Database:
         # Now, since there are two possible expansions for viscosity, and data is given for only one, the other is None, and should be
         # excluded
         viscosity_keys = ['viscosity_exp', 'viscosity_base10']
-        if all( [ row[self._CSV_HEADERS[viscosity_key]] == None for viscosity_key in viscosity_keys ] ):
-            # Neither viscosity key is given, just for completeness take the first key (even though it's None)
-            row.pop(self._CSV_HEADERS[viscosity_keys[1]])
-        else:
-            # Git rid of the other key
-            for viscosity_key in viscosity_keys:
-                if row[self._CSV_HEADERS[viscosity_key]] == None:
-                    row.pop(self._CSV_HEADERS[viscosity_key])
+        self._parse_viscosity_coefs(viscosity_keys, parsed_row)
         # Now convert all keys to the convenient names
         def get_first_key_with_value(value_to_match, my_dict):
             return next( ( key for key, value in my_dict.items() if value ==  value_to_match), None )
         parsed_row = {get_first_key_with_value(key, self._CSV_HEADERS): value for key, value in parsed_row.items() }
         return parsed_row
+    
+    def _parse_viscosity_coefs(self, viscosity_keys, row):
+        """This function is meant for processing viscosity expansion coefficients"""
+        coefs = [ row[self._CSV_HEADERS[viscosity_key]][0] for viscosity_key in viscosity_keys ]
+        ranges = [ row[self._CSV_HEADERS[viscosity_key]][1] for viscosity_key in viscosity_keys ]
+        all_coefs_are_None = [ all([val == None for val in coef_array]) for coef_array in coefs ]
+        range_is_None = [ range == None for range in ranges ]
+
+        temperature_range_is_in_wrong_expansion = (all_coefs_are_None[0] and range_is_None[1]) \
+                                                or (all_coefs_are_None[1] and range_is_None[0])
+
+        if all(all_coefs_are_None) and all(range_is_None):
+            # No viscosity data is given for this salt, so just remove the viscosity keys
+            for viscosity_key in viscosity_keys:
+                row.pop(self._CSV_HEADERS[viscosity_key])
+        else:
+            if temperature_range_is_in_wrong_expansion:
+                # Then switch the temperature range to the expansion with a nonempty coefficient array
+                ranges[0], ranges[1] = ranges[1], ranges[0]
+            # Now pop off the empty viscosity expansion
+            for viscosity_key, all_coefs_None, coef_array, range in zip(viscosity_keys, all_coefs_are_None, coefs, ranges):
+                if all_coefs_None:
+                    row.pop(self._CSV_HEADERS[viscosity_key])
+                else:
+                    row[self._CSV_HEADERS[viscosity_key]] = [coef_array, range]
+
+    def _parse_temp_range(self, col):
+        """A function for parsing a temperature range into a tuple or a None"""
+        if col == '----' or col == '':
+            append_val = None
+        else:
+            if "-" in col and col.split('-')[0] != '': # The second condition checks for a minus sign
+                if col.split('-')[1] == '': # Upper value not given
+                    lower_bound = float(col.split('-')[0])
+                    append_val = (lower_bound, lower_bound + 500) # Assume a 500 K temperature range
+                elif col.split('-')[0][-1] == 'E': # A number in scientific notation
+                    append_val = float(col)
+                else:
+                    append_val = tuple( float(subval) for subval in col.split('-') )
+            else:
+                append_val = col
+        return append_val
 
 # Example usage:
 mstdb_tp_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Properties.csv')
-db = Database(mstdb_tp_path)
+mstdb_tp_rk_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Properties_2.1.0_RK.csv')
+
+db = Database(mstdb_tp_path, mstdb_tp_rk_path)
 example_salt = frozendict({'AlCl3': 1.0})
 print(db.data[example_salt])  # This will print the parsed data as a dictionary with frozendict keys
