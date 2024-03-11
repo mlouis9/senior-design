@@ -36,11 +36,14 @@ class Database:
                 for row in reader:
                     composition_dict = self._parse_composition(row)
                     parsed_row = self._parse_row(row)
+                    # Now, for each of the thermophysical properties with expansion functions, replace the array with a function
+                    for tp_key in [ key for key in self._outer._TP_FUNCTIONS.keys() if key in parsed_row.keys() ]:
+                        if parsed_row[tp_key] is not None:
+                            parsed_row[tp_key] = self._make_thermo_function(parsed_row, tp_key)
                     data.update({composition_dict: parsed_row})
-                # Now, for each of the thermophysical properties with expansion functions, replace the array with a function
             return data
         
-        def _make_thermo_function(self, salt: dict, key: str, tmin: float=None, tmax: float=None) -> Callable(float):
+        def _make_thermo_function(self, salt: dict, key: str, tmin: float=None, tmax: float=None) -> Callable[[float], float]:
             """A function that replaces each thermophysical property with a function that returns that thermophysical
             property (in SI units) as a function of temperature
             
@@ -56,14 +59,20 @@ class Database:
                 A function that takes the temperature (in K) and returns the thermophysical property corresponding to
                 the key
             """
+            coef_array = salt[key][0]
+
             def thermo_function(T: float) -> float:
-                thermo_function.min_temp = tmin # May be None
-                thermo_function.max_temp = tmax # May be None
-                if thermo_function.min_temp != None and thermo_function.max_temp != None: # A valid applicable temperature range
-                    if not thermo_function.min_temp <= T <= thermo_function.max_temp:
-                        warnings.warn(f"Temperature {T} is out of the applicable range ({thermo_function.min_temp}, {thermo_function.max_temp}) for this property.", UserWarning)
-                thermo_function.coef_array = salt[key][0]
-                return self._outer._TP_FUNCTIONS[key](*thermo_function.coef_array, T)
+                if tmin is not None and tmax is not None: # A valid applicable temperature range
+                    if not tmin <= T <= tmax:
+                        warnings.warn(f"Temperature {T} is out of the applicable range ({tmin}, {tmax}) for this property.", UserWarning)
+                return self._outer._TP_FUNCTIONS[key](*coef_array, T)
+            
+            # Now set attributes
+            thermo_function.min_temp = tmin # May be None
+            thermo_function.max_temp = tmax # May be None
+            thermo_function.coef_array = coef_array     
+
+            return thermo_function
         
         def _parse_mstdb_tp_rk(self, mstdb_tp_rk_path):
             """Function for parsing the .csv file containing the RK coefficients for the density expansion. Since this
@@ -358,4 +367,4 @@ mstdb_tp_rk_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Prope
 
 db = Database(mstdb_tp_path, mstdb_tp_rk_path)
 example_salt = frozendict({'AlCl3': 1.0})
-# print(db.data[example_salt])  # This will print the parsed data as a dictionary with frozendict keys
+print(db.data[example_salt]['liquid_heat_capacity'].coef_array)  # This will print the parsed data as a dictionary with frozendict keys
