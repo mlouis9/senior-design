@@ -7,13 +7,27 @@ import warnings
 import pint
 from numpy import pi, sqrt, log, exp, log10, power
 
+""" This is a module for reading and calculating thermophysical properties from the MSTDB using ideal estimations (e.g. 
+additivity of molar volumes) and the RK expansion for estimating the effects nonideal mixing.
+
+Author: Matthew Louis"""
+
 ureg = pint.UnitRegistry(auto_reduce_dimensions=True)
 ureg.default_format = "~P"
 Q_ = ureg.Quantity
 
-""" This is a module for reading and calculating thermophysical properties from the MSTDB using ideal estimations (e.g. 
-additivity of molar volumes) and the RK expansion for estimating the effects nonideal mixing.
-"""
+# ---------------------
+# Customized Warnings
+# ---------------------
+
+# ANSI escape code for yellow
+YELLOW = '\033[93m'
+RESET = '\033[0m'
+
+# Customize warning format and add color
+warnings.formatwarning = lambda message, category, filename, lineno, line=None: \
+    f'{YELLOW}{filename}:{lineno}: {category.__name__}: {message}{RESET}\n'
+
 
 def docstring_injector(cls):
     """This dectorator iterates overall all the methods of a class looking for callable objects
@@ -414,19 +428,34 @@ class Database:
                                                     "invalid salt mixture")
         # Make sure endmembers are in database
         database_endmembers = set(key for frozen_dict_key in self.data.keys() for key in frozen_dict_key.keys())
-        number_of_endmembers_with_data = 0
+        endmembers_with_data = {endmember: 0 for endmember in composition_dict.keys()}
         for endmember in composition_dict.keys():
             assert endmember in database_endmembers, (f"The endmember {endmember} is not contiained in the given database"
                                                        "either update the database path or provide a different salt")
             
             if self.data[frozendict({endmember: 1.0})][thermophysical_property] is not None:
-                number_of_endmembers_with_data += 1
+                endmembers_with_data[endmember] = 1
+            else:
+                # Make sure the user is aware that certain endmembers lack data if they do
+                warnings.warn((f"The endmember: {endmember} does not have data (as a pure component) for the "
+                               f"requested thermophysical property: {thermophysical_property}, this component "
+                               "will be excluded from the property estimation."), UserWarning)
 
         # Verify that, for at least one of the endmembers, the requested thermophysical property is actually evaluated in the database
         # as a pure compound (not including relevant binary subsystems for now)
-        assert number_of_endmembers_with_data != 0, (f"The endmember {endmember} does not have any data for the thermophysical"
-                                                      f"property {thermophysical_property}.")
-        
+        number_of_endmembers_with_data = sum(endmembers_with_data.values())
+        assert number_of_endmembers_with_data != 0, (f"None of the endmembers have any data for the requested thermophysical"
+                                                     f"property {thermophysical_property}.")  
+
+
+        # ---------------------------------------------------------------------------
+        # Now perform ideal property estimation (this will be refined with RK later)
+        # ---------------------------------------------------------------------------
+
+        def ideal_estimation():
+            """This function estimates the desired thermophysical property of a higher order
+            salt using the ideal mixing assumption"""
+            return 
 
 # Example usage:
 mstdb_tp_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Properties.csv')
@@ -436,5 +465,5 @@ db = Database(mstdb_tp_path, mstdb_tp_rk_path)
 example_salt = frozendict({'AlCl3': 1.0})
 print(db.data[example_salt]['viscosity'].units)  # This will print the parsed data as a dictionary with frozendict keys
 
-test_salt = {'NaCl': 0.25, 'UCl3': 0.25, 'PuCl3': 0.25, 'KCl': 0.25}
-print(db.get_tp('thermal_conductivity', test_salt))
+test_salt = {'NaCl': 0.25, 'UCl3': 0.25, 'PuCl3': 0.25, 'KCl': 0.20, 'ZrCl4': 0.05}
+print(db.get_tp('liquid_heat_capacity', test_salt))
