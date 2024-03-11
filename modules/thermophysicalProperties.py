@@ -142,13 +142,9 @@ class Database:
                     # Now, for each of the thermophysical properties with expansion functions, replace the array with a function
                     for tp_key in [ key for key in Database._TP_FUNCTIONS.keys() if key in parsed_row.keys() ]:
                         if parsed_row[tp_key] is not None: # Can be none if tp_key is the wrong viscosity functionalization
-                            if 'viscosity' in tp_key:
-                                # No longer need to keep track of the different viscosity functionalizations
-                                viscosity_func = self._make_thermo_function(parsed_row, tp_key)
-                                parsed_row.pop(tp_key)
-                                parsed_row.update({'viscosity': viscosity_func})
-                            else:
-                                parsed_row[tp_key] = self._make_thermo_function(parsed_row, tp_key)
+                            parsed_row[tp_key] = self._make_thermo_function(parsed_row, tp_key)
+                        if 'viscosity' in tp_key:
+                            parsed_row['viscosity'] = parsed_row.pop(tp_key)
                     data.update({composition_dict: parsed_row})
             return data
         
@@ -405,9 +401,32 @@ class Database:
         
         Returns:
         --------
-            A function that takes the temperature in K and returns the thermophysical property of interest in SI units
-        
+            A function that takes the temperature in K and returns the thermophysical property of interest in SI units. For
+            clarity, the units are given in the .units attribute of the function
         """
+
+        # ----------------------------------------------------------
+        # First perform checks on the input to make sure it's valid
+        # ----------------------------------------------------------
+
+        # Check mole fractions of endmembers add to 1
+        assert sum(composition_dict.values()) ==1, ("The mole fractions of the endmembers do not sum to 1, this is an "
+                                                    "invalid salt mixture")
+        # Make sure endmembers are in database
+        database_endmembers = set(key for frozen_dict_key in self.data.keys() for key in frozen_dict_key.keys())
+        number_of_endmembers_with_data = 0
+        for endmember in composition_dict.keys():
+            assert endmember in database_endmembers, (f"The endmember {endmember} is not contiained in the given database"
+                                                       "either update the database path or provide a different salt")
+            
+            if self.data[frozendict({endmember: 1.0})][thermophysical_property] is not None:
+                number_of_endmembers_with_data += 1
+
+        # Verify that, for at least one of the endmembers, the requested thermophysical property is actually evaluated in the database
+        # as a pure compound (not including relevant binary subsystems for now)
+        assert number_of_endmembers_with_data != 0, (f"The endmember {endmember} does not have any data for the thermophysical"
+                                                      f"property {thermophysical_property}.")
+        
 
 # Example usage:
 mstdb_tp_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Properties.csv')
@@ -416,3 +435,6 @@ mstdb_tp_rk_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Prope
 db = Database(mstdb_tp_path, mstdb_tp_rk_path)
 example_salt = frozendict({'AlCl3': 1.0})
 print(db.data[example_salt]['viscosity'].units)  # This will print the parsed data as a dictionary with frozendict keys
+
+test_salt = {'NaCl': 0.25, 'UCl3': 0.25, 'PuCl3': 0.25, 'KCl': 0.25}
+print(db.get_tp('thermal_conductivity', test_salt))
