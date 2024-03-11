@@ -1,5 +1,5 @@
 import thermoTools
-import thermoToolsAdditions as tta
+import modules.thermoToolsAdditions as tta
 import json
 from pathlib import Path
 import matplotlib.pyplot as plt
