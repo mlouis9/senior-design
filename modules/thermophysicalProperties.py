@@ -85,6 +85,15 @@ class Database:
         'thermal_conductivity': THERMAL_CONDUCTIVITY,
         'liquid_heat_capacity': HEAT_CAPACITY
     }
+
+    _TP_UNITS = {
+        'viscosity_exp': 'Pa*s',
+        'viscosity_base10': 'Pa*s',
+        'density': 'kg/m^3',
+        'thermal_conductivity': 'W/(m*K)',
+        'liquid_heat_capacity': 'J/(kg*K)'
+    }
+    
     _UNIQUE_TP_NAMES = [
         'viscosity',
         'density',
@@ -170,7 +179,8 @@ class Database:
             # Now set attributes
             thermo_function.min_temp = tmin # May be None
             thermo_function.max_temp = tmax # May be None
-            thermo_function.coef_array = coef_array     
+            thermo_function.coef_array = coef_array
+            thermo_function.units = Database._TP_UNITS[key]
 
             return thermo_function
         
@@ -390,11 +400,12 @@ class Database:
         Parameters:
         -----------
             thermophysical_property: Can take the values: {UNIQUE_TP_NAMES}
-            composition_dict:
+            composition_dict: A composition dict corresponding to an arbitrary molten salt (with an arbitrary composition)
+                              whose endmembers are in the database
         
         Returns:
         --------
-            callable
+            A function that takes the temperature in K and returns the thermophysical property of interest in SI units
         
         """
 
@@ -404,5 +415,4 @@ mstdb_tp_rk_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Prope
 
 db = Database(mstdb_tp_path, mstdb_tp_rk_path)
 example_salt = frozendict({'AlCl3': 1.0})
-print(db.data[example_salt])  # This will print the parsed data as a dictionary with frozendict keys
-print(Database.get_tp.__doc__)
+print(db.data[example_salt]['viscosity'].units)  # This will print the parsed data as a dictionary with frozendict keys
