@@ -84,7 +84,15 @@ class Database:
     
     def _parse_row_rk(self, row):
         """Function for parsing rows of the MSTDB-TP RK csv"""
-        parsed_row = dict()
+        parsed_row = [[],]
+        keys_by_coefficient_order = [ ( self._CSV_HEADERS_RK[f'a{i}'], self._CSV_HEADERS_RK[f'b{i}'] ) for i in range(1,4) ]
+
+        # First add coefficients for each order
+        for keys_at_order in keys_by_coefficient_order:
+            parsed_row[0].append([float(row[keys_at_order[0]]), float(row[keys_at_order[1]])])
+
+        # Then add temperature range
+        parsed_row.append((float(row[self._CSV_HEADERS_RK['tmin']]), float(row[self._CSV_HEADERS_RK['tmax']])))
 
         return parsed_row
 
@@ -250,4 +258,5 @@ mstdb_tp_rk_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Prope
 
 db = Database(mstdb_tp_path, mstdb_tp_rk_path)
 example_salt = frozendict({'AlCl3': 1.0})
-print(db.data[example_salt])  # This will print the parsed data as a dictionary with frozendict keys
+# print(db.data[example_salt])  # This will print the parsed data as a dictionary with frozendict keys
+print(db.rk)
