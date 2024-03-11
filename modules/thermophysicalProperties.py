@@ -55,7 +55,7 @@ class Database:
         dependence expansion of TP's"""
         # First remove the first row of reader, it corresponds to the subheader
         reader.pop(0)
-        # reader = [{key: value for key, value in row.items() if key != ''} for row in reader]
+        reader = [{key: value for key, value in row.items() if key != ''} for row in reader] # Filter out empty keys
 
         csvfile.seek(0) # Reset the cursor of the csv
 
@@ -90,7 +90,6 @@ class Database:
                         append_val = None
                     else:
                         append_val = float(col)
-                    print(reader[row_index-3][key_of_last_nonempty_col][0])
                     reader[row_index-3][key_of_last_nonempty_col][0].append(append_val)
                 else:
                     if index_of_last_empty_col == col_index - 1:
@@ -171,11 +170,11 @@ class Database:
         # Now convert all keys to the convenient names
         def get_first_key_with_value(value_to_match, my_dict):
             return next( ( key for key, value in my_dict.items() if value ==  value_to_match), None )
-        # parsed_row = {get_first_key_with_value(key, self._CSV_HEADERS): value for key, value in parsed_row.items() }
-        print(parsed_row)
+        parsed_row = {get_first_key_with_value(key, self._CSV_HEADERS): value for key, value in parsed_row.items() }
         return parsed_row
 
 # Example usage:
 mstdb_tp_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Properties.csv')
 db = Database(mstdb_tp_path)
-# print(db.data)  # This will print the parsed data as a dictionary with frozendict keys
+example_salt = frozendict({'AlCl3': 1.0})
+print(db.data[example_salt])  # This will print the parsed data as a dictionary with frozendict keys
