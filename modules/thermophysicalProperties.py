@@ -3,6 +3,13 @@ from pathlib import Path
 from typing import Dict, Any
 from io import StringIO
 from frozendict import frozendict
+import warnings
+import pint
+from numpy import pi, sqrt, log, exp, log10, power
+
+ureg = pint.UnitRegistry(auto_reduce_dimensions=True)
+ureg.default_format = "~P"
+Q_ = ureg.Quantity
 
 """ This is a module for reading and calculating thermophysical properties from the MSTDB using ideal estimations (e.g. 
 additivity of molar volumes) and the RK expansion for estimating the effects nonideal mixing.
@@ -105,9 +112,25 @@ class Database:
                     else:
                         if index_of_last_empty_col == col_index - 1:
                             # Add temp range to the end of the list
-                            append_val = self._parse_temp_range(col)
+                            last_tp_is_viscosity =  key_of_last_nonempty_col in [self._outer._CSV_HEADERS['viscosity_exp'], \
+                                                                                 self._outer._CSV_HEADERS['viscosity_base10']]
+                            last_tp_coef_array = reader[row_index -3][key_of_last_nonempty_col][0]
+                            if not last_tp_is_viscosity:
+                                # If the list is all None's, just replace it with None
+                                is_none = [coef == None for coef in last_tp_coef_array]
+                                if all(is_none):
+                                    reader[row_index -3][key_of_last_nonempty_col] = None
+                                else:
+                                    # Otherwise add on the temperature range and convert nones to zeros in the array
+                                    append_val = self._parse_temp_range(col)
                                 
-                            reader[row_index -3][key_of_last_nonempty_col][1] = append_val
+                                    reader[row_index -3][key_of_last_nonempty_col][0] = [ 0 if coef is None else coef \
+                                                                                         for coef in last_tp_coef_array ]
+                                    reader[row_index -3][key_of_last_nonempty_col][1] = append_val
+                            else: # Last tp is viscosity
+                                append_val = self._parse_temp_range(col)
+
+                                reader[row_index -3][key_of_last_nonempty_col][1] = append_val
 
                         key_of_last_nonempty_col = headers[col_index]
 
@@ -186,9 +209,9 @@ class Database:
                                                     or (all_coefs_are_None[1] and range_is_None[0])
 
             if all(all_coefs_are_None) and all(range_is_None):
-                # No viscosity data is given for this salt, so just remove the viscosity keys
-                for viscosity_key in viscosity_keys:
-                    row.pop(self._outer._CSV_HEADERS[viscosity_key])
+                # No viscosity data is given for this salt, so just remove the second viscosity key and set the other to None
+                row.pop(self._outer._CSV_HEADERS[viscosity_keys[1]])
+                row[self._outer._CSV_HEADERS[viscosity_keys[0]]] = None
             else:
                 if temperature_range_is_in_wrong_expansion:
                     # Then switch the temperature range to the expansion with a nonempty coefficient array
@@ -198,7 +221,8 @@ class Database:
                     if all_coefs_None:
                         row.pop(self._outer._CSV_HEADERS[viscosity_key])
                     else:
-                        row[self._outer._CSV_HEADERS[viscosity_key]] = [coef_array, range]
+                        row[self._outer._CSV_HEADERS[viscosity_key]] = [ [0 if coef is None else coef for coef in coef_array], \
+                                                                         range]
 
         def _parse_temp_range(self, col):
             """A function for parsing a temperature range into a tuple or a None"""
@@ -214,55 +238,93 @@ class Database:
                     else:
                         append_val = tuple( float(subval) for subval in col.split('-') )
                 else:
-                    append_val = col
+                    append_val = float(col) # An uncertainty, in %
             return append_val
 
-    def __init__(self, mstdb_tp_path: Path, mstdb_tp_rk_path: Path, CSV_HEADERS: dict=None, CSV_VALUES: dict=None, \
-                 CSV_HEADERS_RK: dict=None) -> None:
+    def __init__(self, mstdb_tp_path: Path, mstdb_tp_rk_path: Path) -> None:
         """Initializer for the Database class which stores a given version of the MSTDB TP and parses results from it"""
-        if CSV_HEADERS == None:
-            # Configuration for CSV headers
-            self._CSV_HEADERS = {
-                'formula': 'Formula',
-                'molecular_weight': 'Molecular Weight',
-                'composition': 'Composition (Mole %)',
-                'uncertainty': 'Uncertainty (%)',
-                'temp_uncertainty': 'Uncertainty (K)',
-                'references': 'References',
-                'temp_range': 'Applicable Temperature range (K)',
-                'melting_temp': 'Melting T (K)',
-                'boiling_temp': 'Boiling T (K)',
-                'number': '#',
-                'density': 'Density (g/cm3):   A - BT(K)',
-                'viscosity_exp': 'Viscosity (mN*s/m2): A*exp(B/(R*T(K)))',
-                'viscosity_base10': 'Viscosity (mN*s/m2): 10^(A + B/T + C/T**2)',
-                'thermal_conductivity': 'Thermal Conductivity (W/m K):  A + B*T(K)',
-                'liquid_heat_capacity': "Heat Capacity of Liquid (J/K mol):        \n A + B*T(K) + C*T-2(K) + D*T2(K)"
-            }
-        if CSV_VALUES == None:
-            self._CSV_VALUES = {
-                'pure_salt': 'Pure Salt'
-            }
-        if CSV_HEADERS_RK == None:
-            # Headers for the RK expansion coefficient file
-            self._CSV_HEADERS_RK = {
-                'component1': 'C1',
-                'component2': 'C2',
-                'a1': 'A1',
-                'b1': 'B1',
-                'a2': 'A2',
-                'b2': 'B2',
-                'a3': 'A3',
-                'b3': 'B3',
-                'tmin': 'T min',
-                'tmax': 'T max',
-                'reference': 'Reference'
-            }
+        # Configuration for CSV headers
+        self._CSV_HEADERS = {
+            'formula': 'Formula',
+            'molecular_weight': 'Molecular Weight',
+            'composition': 'Composition (Mole %)',
+            'uncertainty': 'Uncertainty (%)',
+            'temp_uncertainty': 'Uncertainty (K)',
+            'references': 'References',
+            'temp_range': 'Applicable Temperature range (K)',
+            'melting_temp': 'Melting T (K)',
+            'boiling_temp': 'Boiling T (K)',
+            'number': '#',
+            'density': 'Density (g/cm3):   A - BT(K)',
+            'viscosity_exp': 'Viscosity (mN*s/m2): A*exp(B/(R*T(K)))',
+            'viscosity_base10': 'Viscosity (mN*s/m2): 10^(A + B/T + C/T**2)',
+            'thermal_conductivity': 'Thermal Conductivity (W/m K):  A + B*T(K)',
+            'liquid_heat_capacity': "Heat Capacity of Liquid (J/K mol):        \n A + B*T(K) + C*T-2(K) + D*T2(K)"
+        }
+        # Physical constants
+        self.R = 8.314 # J/(K*mol)
+
+        # ------------------------------------------------------------------------------------------
+        # These are the functional expansions of the thermophysical properties given in the MSTDB,
+        # they are all constant, and dependent only on the version/format of the MSTDB-TP
+        # ------------------------------------------------------------------------------------------
+
+        def VISCOSITY_EXP(A, B, T):
+            # Note this returns dynamic viscosity in units of Pa*s
+            return ( A*exp(B/(self.R*T)) )*ureg('mN*s/m^2').to('Pa*s').magnitude
+        def VISCOSITY_BASE_10(A, B, C, T):
+            # Note this returns dynamic viscosity in units of Pa*s
+            return ( power( 10, A + B/T + C/T**2 ) )*ureg('mN*s/m^2').to('Pa*s').magnitude
+        def DENSITY(A, B, T):
+            # Returns the density in SI units
+            return ( A - B*T )*ureg('g/cm^3').to('kg/m^3').magnitude
+        def THERMAL_CONDUCTIVITY(A, B, T):
+            # Returns thermal conducitivty in SI units
+            return A - B*T
+        def HEAT_CAPACITY(MW, A, B, C, D, T):
+            # Returns heat capacity in SI units, i.e. J/(kg * K), hence why we have to divide
+            # by the molecular weight in g/mol
+            return ( ( A + B*T + C/T**2 + D*T**2 )/(MW*ureg('g/mol').to('kg/mol')) ).magnitude
+
+        self._TP_FUNCTIONS = {
+            'viscosity_exp': VISCOSITY_EXP,
+            'viscosity_base10': VISCOSITY_BASE_10,
+            'density': DENSITY,
+            'thermal_conductivity': THERMAL_CONDUCTIVITY,
+            'liquid_heat_capacity': HEAT_CAPACITY
+        }
+        self._CSV_VALUES = {
+            'pure_salt': 'Pure Salt'
+        }
+        # Headers for the RK expansion coefficient file
+        self._CSV_HEADERS_RK = {
+            'component1': 'C1',
+            'component2': 'C2',
+            'a1': 'A1',
+            'b1': 'B1',
+            'a2': 'A2',
+            'b2': 'B2',
+            'a3': 'A3',
+            'b3': 'B3',
+            'tmin': 'T min',
+            'tmax': 'T max',
+            'reference': 'Reference'
+        }
         self._parser = self._Parsers(self)
         self.data = self._parser._parse_mstdb_tp(mstdb_tp_path)
         self.rk = self._parser._parse_mstdb_tp_rk(mstdb_tp_rk_path)
 
-
+    # def get_tp(self, thermophysical_property: str, composition_dict: dict) -> callable:
+    #     """A function for evaluating thermophysical properties for a given salt composition
+    #     using the database
+        
+    #     Parameters:
+    #     -----------
+        
+    #     Returns:
+    #     --------
+        
+    #     """
 
 # Example usage:
 mstdb_tp_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Properties.csv')
@@ -271,4 +333,4 @@ mstdb_tp_rk_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Prope
 db = Database(mstdb_tp_path, mstdb_tp_rk_path)
 example_salt = frozendict({'AlCl3': 1.0})
 # print(db.data[example_salt])  # This will print the parsed data as a dictionary with frozendict keys
-print(db.rk)
+print(db.data)
