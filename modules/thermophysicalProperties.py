@@ -39,6 +39,66 @@ def docstring_injector(cls):
             method.__doc__ = method.__doc__.format(UNIQUE_TP_NAMES=unique_tp_names)
     return cls
 
+import math
+import warnings
+
+class ThermoFunction:
+    # Assume Database and other necessary imports and definitions exist
+
+    def __init__(self, salt: dict, key: str, tmin: float = None, tmax: float = None, fractional_uncertainty: float = None):
+        self.coef_array = salt[key][0]
+        self.min_temp = tmin
+        self.max_temp = tmax
+        self.units = Database._TP_UNITS[key]  # Assuming Database has this attribute
+        self.key = key
+        self.salt = salt
+        self.fractional_uncertainty = fractional_uncertainty
+
+    def __call__(self, T: float) -> float:
+        if self.min_temp is not None and self.max_temp is not None:
+            if not self.min_temp <= T <= self.max_temp:
+                warnings.warn(f"Temperature {T} is out of the applicable range ({self.min_temp}, {self.max_temp}) for this property.", UserWarning)
+        if self.key == 'liquid_heat_capacity':
+            MW = self.salt['molecular_weight']
+            return Database._TP_FUNCTIONS[self.key](MW, *self.coef_array, T)
+        else:
+            return Database._TP_FUNCTIONS[self.key](*self.coef_array, T)
+
+    def __add__(self, other):
+        if not isinstance(other, ThermoFunction):
+            return NotImplemented
+
+        def new_thermo_function(T: float) -> float:
+            return self(T) + other(T)
+
+        def combined_uncertainty(self_val, other_val, self_unc, other_unc):
+            if self_unc is None and other_unc is None:
+                return None
+            self_var = (self_unc * self_val)**2 if self_unc is not None else 0
+            other_var = (other_unc * other_val)**2 if other_unc is not None else 0
+            combined_var = self_var + other_var
+            combined_std_dev = math.sqrt(combined_var)
+            combined_value = self_val + other_val
+            return combined_std_dev / combined_value if combined_value != 0 else None
+        
+        new_min_temp = max(self.min_temp, other.min_temp) if None not in (self.min_temp, other.min_temp) else None
+        new_max_temp = min(self.max_temp, other.max_temp) if None not in (self.max_temp, other.max_temp) else None
+
+        # Create a new ThermoFunction object with combined properties
+        new_obj = ThermoFunction(self.salt, self.key, new_min_temp, new_max_temp)
+        new_obj.__call__ = lambda T: new_thermo_function(T)
+        new_obj.units = self.units  # Assuming the units are the same for both functions
+        
+        # Define how to propagate uncertainties for the combined function
+        new_obj.fractional_uncertainty = lambda T: combined_uncertainty(
+            self(T),
+            other(T),
+            self.fractional_uncertainty(T) if callable(self.fractional_uncertainty) else self.fractional_uncertainty,
+            other.fractional_uncertainty(T) if callable(other.fractional_uncertainty) else other.fractional_uncertainty
+        )
+        
+        return new_obj
+
 @docstring_injector
 class Database:
     # Configuration for CSV headers
@@ -254,54 +314,23 @@ class Database:
                     # Now, for each of the thermophysical properties with expansion functions, replace the array with a function
                     for tp_key in [ key for key in Database._TP_FUNCTIONS.keys() if key in parsed_row.keys() ]:
                         if parsed_row[tp_key] is not None: # Can be none if tp_key is the wrong viscosity functionalization
-                            parsed_row[tp_key] = self._make_thermo_function(parsed_row, tp_key)
+                            if isinstance(parsed_row[tp_key][1], float):
+                                # Just a single number, then it's an uncertainty
+                                tmin, tmax = (None, None)
+                                uncertainty = parsed_row[tp_key][1]/100 # Given as a percent in the MSTDB-TP
+                            else:
+                                uncertainty = None
+                                tmin, tmax = parsed_row[tp_key][1] if parsed_row[tp_key][1] is not None else (None, None)
+                            parsed_row[tp_key] = ThermoFunction(parsed_row, tp_key, tmin, tmax, uncertainty)
                         if 'viscosity' in tp_key:
                             parsed_row['viscosity'] = parsed_row.pop(tp_key)
                     data.update({composition_dict: parsed_row})
             return data
         
-        def _make_thermo_function(self, salt: dict, key: str, tmin: float=None, tmax: float=None) -> Callable[[float], float]:
-            """A function that replaces each thermophysical property with a function that returns that thermophysical
-            property (in SI units) as a function of temperature
-            
-            Parameters:
-            -----------
-                salt: The salt whose thermophysical property at the given key is being calculated 
-                key: A string corresponding to the thermophysical property of interest
-                tmin: The minimum applicable temperature (the ouput function will issuue a warning if below this temperature)
-                tmax: The maximum applicable temperature                 ^                            above
-            
-            Returns:
-            --------
-                A function that takes the temperature (in K) and returns the thermophysical property corresponding to
-                the key
-            """
-            coef_array = salt[key][0]
-
-            def thermo_function(T: float) -> float:
-                if tmin is not None and tmax is not None: # A valid applicable temperature range
-                    if not tmin <= T <= tmax:
-                        warnings.warn(f"Temperature {T} is out of the applicable range ({tmin}, {tmax}) for this property.", UserWarning)
-                if key == 'liquid_heat_capacity':
-                    # Also need to pass MW
-                    MW = salt['molecular_weight']
-                    return Database._TP_FUNCTIONS[key](MW, *coef_array, T)
-                else:
-                    return Database._TP_FUNCTIONS[key](*coef_array, T)
-            
-            # Now set attributes
-            thermo_function.min_temp = tmin # May be None
-            thermo_function.max_temp = tmax # May be None
-            thermo_function.coef_array = coef_array
-            thermo_function.units = Database._TP_UNITS[key]
-
-            return thermo_function
-        
         def _parse_mstdb_tp_rk(self, mstdb_tp_rk_path):
             """Function for parsing the .csv file containing the RK coefficients for the density expansion. Since this
             csv does not have a subheader, its processing should be much easier"""
             rk = dict()
-            print(mstdb_tp_rk_path)
             with mstdb_tp_rk_path.open('r', errors='replace') as csvfile:
                 reader = csv.DictReader(csvfile, delimiter=',')
                 for row in reader:
@@ -637,5 +666,6 @@ db = Database(mstdb_tp_path, mstdb_tp_rk_path)
 example_salt = frozendict({'AlCl3': 1.0})
 
 # test_salt = {'NaCl': 0.25, 'UCl3': 0.25, 'PuCl3': 0.25, 'KCl': 0.20, 'ZrCl4': 0.05}
-test_salt = {'LiCl': 0.5, 'KCl': 0.25, 'PuCl3': 0.25}
+# test_salt = {'LiCl': 0.5, 'KCl': 0.25, 'PuCl3': 0.25}
+test_salt = {'LiCl': 0.5, 'KCl': 0.5}
 print(db.get_tp('density', test_salt))
