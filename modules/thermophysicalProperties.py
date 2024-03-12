@@ -5,10 +5,10 @@ from io import StringIO
 from frozendict import frozendict
 import warnings
 import pint
-from numpy import pi, sqrt, log, exp, log10, power
+from numpy import exp, power
 from itertools import combinations
-import math
-from uncertainties import ufloat
+from uncertainties import ufloat, unumpy
+import uncertainties
 import numpy as np
 
 """ This is a module for reading and calculating thermophysical properties from the MSTDB using ideal estimations (e.g. 
@@ -42,76 +42,41 @@ def docstring_injector(cls):
             method.__doc__ = method.__doc__.format(UNIQUE_TP_NAMES=unique_tp_names)
     return cls
 
-class ThermoFunction:
+class ArbitraryThermoFunction:
     """This class is used for defining functions that represent the thermophysical properties of molten salts. The objects of this
     class are functions of a float (temperature) and they output the desired thermophysical property. This class conveniently
     defines addition, multiplication, etc. and performs error propagation to ensure that the result ThermoFunction has the correct
     applicable temperature range (or uncertainty)."""
 
-    # Once the database is processed once, there is no longer a 'viscosity_exp' or 'viscosity_base10' key, instead they have just been
-    # replaced with 'viscosity'. This class attribute keeps track of when this occurs.
-    has_been_parsed = False
-    def __init__(self, salt, key):
-        self.salt = salt
-        self.key = key
-        
-        # If dealing with viscosity, since the database is modified to exclude one of the viscosity keys
-        # and have only 'viscosity', we need to catch this case
-        if 'viscosity' in self.key and ThermoFunction.has_been_parsed:
-            key_of_thermo_func = 'viscosity'
-        else:
-            key_of_thermo_func = self.key
-        if isinstance(salt[key_of_thermo_func], ThermoFunction):
-            # If salt[key_of_thermo_func] is already a ThermoFunction, no need to parse
-            # they min/max temp, etc. just take it from the ThermoFunction attributes
-            self.coef_array = salt[key_of_thermo_func].coef_array
-            self.min_temp = salt[key_of_thermo_func].min_temp
-            self.max_temp = salt[key_of_thermo_func].max_temp
-            self.fractional_uncertainty = salt[key_of_thermo_func].fractional_uncertainty
-            self.units = salt[key_of_thermo_func].units
-        else:
-            self.coef_array = salt[key][0]
-            
-            if isinstance(salt[key][1], tuple):
-                self.min_temp, self.max_temp = salt[key][1]
-                self.fractional_uncertainty = None
-            elif isinstance(salt[key][1], float):
-                self.fractional_uncertainty = salt[key][1]
-                self.min_temp = None
-                self.max_temp = None
-            else:
-                self.fractional_uncertainty = None
-                self.min_temp = None
-                self.max_temp = None
-            
-            self.units = Database._TP_UNITS[key]
+    def __init__(self, func, tmin=None, tmax=None, uncertainty=None, units=None):
+        self.func = func
+        self.min_temp = tmin
+        self.max_temp = tmax
+        self.fractional_uncertainty = uncertainty
+        self.units = units
 
     def __call__(self, temp):
         if self.min_temp is not None and self.max_temp is not None:
             if temp < self.min_temp or temp > self.max_temp:
                 warnings.warn(
-                    f"Temperature {temp} is outside the valid range [{self.min_temp}, {self.max_temp}] for {self.key}"
+                    f"Temperature {temp} is outside the valid range [{self.min_temp}, {self.max_temp}]"
                 , UserWarning)
         unc = self.fractional_uncertainty if self.fractional_uncertainty is not None else 0.0
-        if self.key == 'liquid_heat_capacity':
-            MW = self.salt['molecular_weight']
-            return ufloat(Database._TP_FUNCTIONS[self.key](MW, *self.coef_array, temp), unc)
-        else:
-            return ufloat(Database._TP_FUNCTIONS[self.key](*self.coef_array, temp), unc)
+        result = self.func(temp)
+        try:
+            return ufloat(result, unc)
+        except:
+            return result
 
     def __add__(self, other):
-        if isinstance(other, ThermoFunction):
+        if isinstance(other, ArbitraryThermoFunction):
             new_min_temp = max(self.min_temp, other.min_temp) if self.min_temp is not None and other.min_temp is not None else None
             new_max_temp = min(self.max_temp, other.max_temp) if self.max_temp is not None and other.max_temp is not None else None
             
             def new_func(temp):
                 return self(temp) + other(temp)
             
-            new_tf = ThermoFunction(self.salt, self.key)
-            new_tf.min_temp = new_min_temp
-            new_tf.max_temp = new_max_temp
-            new_tf.__call__ = new_func
-            return new_tf
+            return ArbitraryThermoFunction(new_func, new_min_temp, new_max_temp)
         else:
             return NotImplemented
 
@@ -123,11 +88,7 @@ class ThermoFunction:
             def new_func(temp):
                 return self(temp) * other
             
-            new_tf = ThermoFunction(self.salt, self.key)
-            new_tf.min_temp = self.min_temp
-            new_tf.max_temp = self.max_temp
-            new_tf.__call__ = new_func
-            return new_tf
+            return ArbitraryThermoFunction(new_func, self.min_temp, self.max_temp)
         else:
             return NotImplemented
 
@@ -139,11 +100,7 @@ class ThermoFunction:
             def new_func(temp):
                 return self(temp) / other
             
-            new_tf = ThermoFunction(self.salt, self.key)
-            new_tf.min_temp = self.min_temp
-            new_tf.max_temp = self.max_temp
-            new_tf.__call__ = new_func
-            return new_tf
+            return ArbitraryThermoFunction(new_func, self.min_temp, self.max_temp)
         else:
             return NotImplemented
 
@@ -152,11 +109,7 @@ class ThermoFunction:
             def new_func(temp):
                 return other / self(temp)
             
-            new_tf = ThermoFunction(self.salt, self.key)
-            new_tf.min_temp = self.min_temp
-            new_tf.max_temp = self.max_temp
-            new_tf.__call__ = new_func
-            return new_tf
+            return ArbitraryThermoFunction(new_func, self.min_temp, self.max_temp)
         else:
             return NotImplemented
 
@@ -164,32 +117,68 @@ class ThermoFunction:
         def new_func(temp):
             return 1 / self(temp)
         
-        new_tf = ThermoFunction(self.salt, self.key)
-        new_tf.min_temp = self.min_temp
-        new_tf.max_temp = self.max_temp
-        new_tf.__call__ = new_func
-        return new_tf
+        return ArbitraryThermoFunction(new_func, self.min_temp, self.max_temp)
 
     def log(self):
         def new_func(temp):
-            return math.log(self(temp))
+            return unumpy.log(self(temp))
         
-        new_tf = ThermoFunction(self.salt, self.key)
-        new_tf.min_temp = self.min_temp
-        new_tf.max_temp = self.max_temp
-        new_tf.__call__ = new_func
-        return new_tf
+        return ArbitraryThermoFunction(new_func, self.min_temp, self.max_temp)
 
     def exp(self):
         def new_func(temp):
-            return math.exp(self(temp))
+            return unumpy.exp(self(temp))
         
-        new_tf = ThermoFunction(self.salt, self.key)
-        new_tf.min_temp = self.min_temp
-        new_tf.max_temp = self.max_temp
-        new_tf.__call__ = new_func
-        return new_tf
+        return ArbitraryThermoFunction(new_func, self.min_temp, self.max_temp)
 
+class ThermoFunction(ArbitraryThermoFunction):
+    # Once the database is processed once, there is no longer a 'viscosity_exp' or 'viscosity_base10' key, instead they have just been
+    # replaced with 'viscosity'. This class attribute keeps track of when this occurs.
+    has_been_parsed = False
+    
+    def __init__(self, salt, key):
+        self.salt = salt
+        self.key = key
+        
+        # If dealing with viscosity, since the database is modified to exclude one of the viscosity keys
+        # and have only 'viscosity', we need to catch this case
+        if 'viscosity' in self.key and ThermoFunction.has_been_parsed:
+            key_of_thermo_func = 'viscosity'
+        else:
+            key_of_thermo_func = self.key
+        
+        if isinstance(salt[key_of_thermo_func], ArbitraryThermoFunction):
+            # If salt[key_of_thermo_func] is already a ThermoFunction, no need to parse
+            # they min/max temp, etc. just take it from the ThermoFunction attributes
+            func = salt[key_of_thermo_func].func
+            min_temp = salt[key_of_thermo_func].min_temp
+            max_temp = salt[key_of_thermo_func].max_temp
+            fractional_uncertainty = salt[key_of_thermo_func].fractional_uncertainty
+            units = salt[key_of_thermo_func].units
+        else:
+            coef_array = salt[key][0]
+            
+            if isinstance(salt[key][1], tuple):
+                min_temp, max_temp = salt[key][1]
+                fractional_uncertainty = None
+            elif isinstance(salt[key][1], float):
+                fractional_uncertainty = salt[key][1]
+                min_temp = None
+                max_temp = None
+            else:
+                fractional_uncertainty = None
+                min_temp = None
+                max_temp = None
+            
+            units = Database._TP_UNITS[key]
+            
+            if key == 'liquid_heat_capacity':
+                MW = salt['molecular_weight']
+                func = lambda temp: Database._TP_FUNCTIONS[key](MW, *coef_array, temp)
+            else:
+                func = lambda temp: Database._TP_FUNCTIONS[key](*coef_array, temp)
+        
+        super().__init__(func, min_temp, max_temp, fractional_uncertainty, units)
 
 @docstring_injector
 class Database:
@@ -727,4 +716,4 @@ example_salt = frozendict({'AlCl3': 1.0})
 # test_salt = {'NaCl': 0.25, 'UCl3': 0.25, 'PuCl3': 0.25, 'KCl': 0.20, 'ZrCl4': 0.05}
 # test_salt = {'LiCl': 0.5, 'KCl': 0.25, 'PuCl3': 0.25}
 test_salt = {'LiCl': 0.5, 'KCl': 0.5}
-print(db.get_tp('density', test_salt))
+print(db.get_tp('viscosity', test_salt)(1000))
