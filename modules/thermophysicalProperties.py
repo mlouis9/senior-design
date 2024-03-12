@@ -43,6 +43,13 @@ def docstring_injector(cls):
     return cls
 
 class ThermoFunction:
+    """This class is used for defining functions that represent the thermophysical properties of molten salts. The objects of this
+    class are functions of a float (temperature) and they output the desired thermophysical property. This class conveniently
+    defines addition, multiplication, etc. and performs error propagation to ensure that the result ThermoFunction has the correct
+    applicable temperature range (or uncertainty)."""
+
+    # Once the database is processed once, there is no longer a 'viscosity_exp' or 'viscosity_base10' key, instead they have just been
+    # replaced with 'viscosity'. This class attribute keeps track of when this occurs.
     has_been_parsed = False
     def __init__(self, salt, key):
         self.salt = salt
@@ -55,6 +62,8 @@ class ThermoFunction:
         else:
             key_of_thermo_func = self.key
         if isinstance(salt[key_of_thermo_func], ThermoFunction):
+            # If salt[key_of_thermo_func] is already a ThermoFunction, no need to parse
+            # they min/max temp, etc. just take it from the ThermoFunction attributes
             self.coef_array = salt[key_of_thermo_func].coef_array
             self.min_temp = salt[key_of_thermo_func].min_temp
             self.max_temp = salt[key_of_thermo_func].max_temp
@@ -658,8 +667,6 @@ class Database:
                           if thermophysical_property != 'density' else \
                           Database.IDEAL_FUNCTIONS[thermophysical_property](tp_of_endmembers, composition_endmembers, mw_endmembers)
 
-        print(ideal_property(1000))
-
         if thermophysical_property == 'density':
             # --------------------------------------------------
             # Perform a redlich kister expansion on the density
@@ -720,4 +727,4 @@ example_salt = frozendict({'AlCl3': 1.0})
 # test_salt = {'NaCl': 0.25, 'UCl3': 0.25, 'PuCl3': 0.25, 'KCl': 0.20, 'ZrCl4': 0.05}
 # test_salt = {'LiCl': 0.5, 'KCl': 0.25, 'PuCl3': 0.25}
 test_salt = {'LiCl': 0.5, 'KCl': 0.5}
-print(db.get_tp('thermal_conductivity', test_salt))
+print(db.get_tp('density', test_salt))
