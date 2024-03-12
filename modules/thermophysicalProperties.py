@@ -1,6 +1,6 @@
 import csv
 from pathlib import Path
-from typing import Dict, Any, Callable
+from typing import Dict, Any, Callable, List
 from io import StringIO
 from frozendict import frozendict
 import warnings
@@ -91,6 +91,70 @@ class Database:
         # Returns heat capacity in SI units, i.e. J/(kg * K), hence why we have to divide
         # by the molecular weight in g/mol
         return ( ( A + B*T + C/T**2 + D*T**2 )/(MW*ureg('g/mol').to('kg/mol')) ).magnitude
+
+    # ------------------------------------------------------------------------------------------
+    # These are the functional expansions of the thermophysical properties of higher order salt
+    # systems using the ideal mixing assumptions
+    # ------------------------------------------------------------------------------------------
+    
+    @staticmethod
+    def IDEAL_VISCOSITY(tp_of_endmembers: List[Callable[[float], float]], composition_endmembers: list, mw_endmembers: list, T:float) -> float:
+        """Calculate the ideal viscosity for a given temperature.
+
+        The ideal viscosity is calculated using the logarithmic mixing rule:
+
+            \\log \\mu_id = \\sum_(i=1)^n \\log(\\mu_i)*x_i
+
+        where \\mu_id is the ideal viscosity, x_i is the mole fraction of
+        the ith component, and \\mu_i is the viscosity of the ith component."""
+        return exp( sum( [ x_i * log( mu_i(T) ) for x_i, mu_i in zip(tp_of_endmembers, composition_endmembers)] ) )
+    
+    @staticmethod
+    def IDEAL_DENSITY(tp_of_endmembers: List[Callable[[float], float]], composition_endmembers: list, mw_endmembers: list, T:float) -> float:
+        """Calculate the ideal viscosity for a given temperature.
+
+        The ideal density is calculated using the ideal mixing rule:
+
+            \\rho_id = \\sum_(i=1)^n x_i*M_i / ( \\sum_(i=1)^n x_i*M_i/\\rho_i )
+
+        where \\rho_id is the ideal density, x_i is the mole fraction of the ith component,
+        M_i is the molecular weight of each component (in kg/mol), and \\rho_i is the density of the ith component."""
+        numerator_sum = sum( [ x_i * M_i*ureg('g/mol').to('kg/mol').magnitude \
+                               for x_i, M_i in zip(composition_endmembers, mw_endmembers)] )
+        denomenator_sum = sum( [ x_i * M_i*ureg('g/mol').to('kg/mol').magnitude / rho_i(T) \
+                                 for rho_i, x_i, M_i in zip(tp_of_endmembers, composition_endmembers, mw_endmembers)] )
+        print([rho_i(T) for rho_i in tp_of_endmembers])
+        return numerator_sum / denomenator_sum
+               
+
+    IDEAL_FUNCTIONS = {
+        'viscosity': IDEAL_VISCOSITY,
+        'density': IDEAL_DENSITY
+    }
+
+    @staticmethod
+    def IDEAL_ESTIMATE(thermophysical_property: str, tp_of_endmembers: List[Callable[[float], float]], \
+                       composition_endmembers: list, mw_endmembers: list) -> Callable[[float], float]:
+        """This function estimates the desired thermophysical property of a higher order salt using the ideal mixing assumption"""
+
+        def ideal_estimate(T: float) -> float:
+            return Database.IDEAL_FUNCTIONS[thermophysical_property](tp_of_endmembers, composition_endmembers, mw_endmembers, T)
+        
+        # Assume all functions have the same units
+        ideal_estimate.units = tp_of_endmembers[0].units
+
+        # If any of the constituient functions have applicable temperature ranges with None endpoints, then
+        # the composite function should as well, otherwise it is the intersection of each of the applicable
+        # ranges
+        if any([(tp_endmember.min_temp is None) or (tp_endmember.max_temp is None) \
+                for tp_endmember in tp_of_endmembers]):
+            ideal_estimate.min_temp = None
+            ideal_estimate.max_temp = None
+        else:
+            ideal_estimate.min_temp = max([tp_endmember.min_temp for tp_endmember in tp_of_endmembers])
+            ideal_estimate.max_temp = min([tp_endmember.max_temp for tp_endmember in tp_of_endmembers])
+            
+        return ideal_estimate
 
     _TP_FUNCTIONS = {
         'viscosity_exp': VISCOSITY_EXP,
@@ -428,13 +492,13 @@ class Database:
                                                     "invalid salt mixture")
         # Make sure endmembers are in database
         database_endmembers = set(key for frozen_dict_key in self.data.keys() for key in frozen_dict_key.keys())
-        endmembers_with_data = {endmember: 0 for endmember in composition_dict.keys()}
+        endmembers_data_dict = {endmember: False for endmember in composition_dict.keys()}
         for endmember in composition_dict.keys():
             assert endmember in database_endmembers, (f"The endmember {endmember} is not contiained in the given database"
                                                        "either update the database path or provide a different salt")
             
             if self.data[frozendict({endmember: 1.0})][thermophysical_property] is not None:
-                endmembers_with_data[endmember] = 1
+                endmembers_data_dict[endmember] = True
             else:
                 # Make sure the user is aware that certain endmembers lack data if they do
                 warnings.warn((f"The endmember: {endmember} does not have data (as a pure component) for the "
@@ -443,7 +507,7 @@ class Database:
 
         # Verify that, for at least one of the endmembers, the requested thermophysical property is actually evaluated in the database
         # as a pure compound (not including relevant binary subsystems for now)
-        number_of_endmembers_with_data = sum(endmembers_with_data.values())
+        number_of_endmembers_with_data = sum(endmembers_data_dict.values())
         assert number_of_endmembers_with_data != 0, (f"None of the endmembers have any data for the requested thermophysical"
                                                      f"property {thermophysical_property}.")  
 
@@ -452,10 +516,28 @@ class Database:
         # Now perform ideal property estimation (this will be refined with RK later)
         # ---------------------------------------------------------------------------
 
-        def ideal_estimation():
-            """This function estimates the desired thermophysical property of a higher order
-            salt using the ideal mixing assumption"""
-            return 
+        # First, get the thermophysical property functions for the endmembers that have data
+        endmembers_with_data = [ endmember for endmember, has_data in endmembers_data_dict.items() if has_data ]
+        tp_of_endmembers = []
+        mw_endmembers = []
+        for endmember in endmembers_with_data:
+            database_key = frozendict({endmember: 1.0})
+            tp_func = self.data[database_key][thermophysical_property]
+            tp_of_endmembers.append(tp_func)
+
+            # Now get molecular weights of endmembers
+            mw_endmembers.append(self.data[database_key]['molecular_weight'])
+
+        # Now, rescale compositions of endmembers with data so that they sum to one (essentially assuming the endmembers without
+        # data don't exist)
+        compositions_with_data = [ composition for endmember, composition in composition_dict.items() \
+                                         if endmember in endmembers_with_data ]
+        composition_endmembers = [ composition / sum(compositions_with_data) for composition in  compositions_with_data]
+
+
+        ideal_property = Database.IDEAL_ESTIMATE(thermophysical_property, tp_of_endmembers, composition_endmembers, mw_endmembers)
+
+        print(f'TEST {ideal_property(1000)}')
 
 # Example usage:
 mstdb_tp_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Properties.csv')
@@ -463,7 +545,7 @@ mstdb_tp_rk_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Prope
 
 db = Database(mstdb_tp_path, mstdb_tp_rk_path)
 example_salt = frozendict({'AlCl3': 1.0})
-print(db.data[example_salt]['viscosity'].units)  # This will print the parsed data as a dictionary with frozendict keys
 
-test_salt = {'NaCl': 0.25, 'UCl3': 0.25, 'PuCl3': 0.25, 'KCl': 0.20, 'ZrCl4': 0.05}
-print(db.get_tp('liquid_heat_capacity', test_salt))
+# test_salt = {'NaCl': 0.25, 'UCl3': 0.25, 'PuCl3': 0.25, 'KCl': 0.20, 'ZrCl4': 0.05}
+test_salt = {'LiCl': 0.5, 'KCl': 0.5}
+print(db.get_tp('density', test_salt))
