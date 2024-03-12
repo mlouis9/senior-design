@@ -7,6 +7,9 @@ import warnings
 import pint
 from numpy import pi, sqrt, log, exp, log10, power
 from itertools import combinations
+import math
+from uncertainties import ufloat
+import numpy as np
 
 """ This is a module for reading and calculating thermophysical properties from the MSTDB using ideal estimations (e.g. 
 additivity of molar volumes) and the RK expansion for estimating the effects nonideal mixing.
@@ -39,65 +42,145 @@ def docstring_injector(cls):
             method.__doc__ = method.__doc__.format(UNIQUE_TP_NAMES=unique_tp_names)
     return cls
 
-import math
-import warnings
-
 class ThermoFunction:
-    # Assume Database and other necessary imports and definitions exist
-
-    def __init__(self, salt: dict, key: str, tmin: float = None, tmax: float = None, fractional_uncertainty: float = None):
-        self.coef_array = salt[key][0]
-        self.min_temp = tmin
-        self.max_temp = tmax
-        self.units = Database._TP_UNITS[key]  # Assuming Database has this attribute
-        self.key = key
+    has_been_parsed = False
+    def __init__(self, salt, key):
         self.salt = salt
-        self.fractional_uncertainty = fractional_uncertainty
+        self.key = key
+        
+        # If dealing with viscosity, since the database is modified to exclude one of the viscosity keys
+        # and have only 'viscosity', we need to catch this case
+        if 'viscosity' in self.key and ThermoFunction.has_been_parsed:
+            key_of_thermo_func = 'viscosity'
+        else:
+            key_of_thermo_func = self.key
+        if isinstance(salt[key_of_thermo_func], ThermoFunction):
+            self.coef_array = salt[key_of_thermo_func].coef_array
+            self.min_temp = salt[key_of_thermo_func].min_temp
+            self.max_temp = salt[key_of_thermo_func].max_temp
+            self.fractional_uncertainty = salt[key_of_thermo_func].fractional_uncertainty
+            self.units = salt[key_of_thermo_func].units
+        else:
+            self.coef_array = salt[key][0]
+            
+            if isinstance(salt[key][1], tuple):
+                self.min_temp, self.max_temp = salt[key][1]
+                self.fractional_uncertainty = None
+            elif isinstance(salt[key][1], float):
+                self.fractional_uncertainty = salt[key][1]
+                self.min_temp = None
+                self.max_temp = None
+            else:
+                self.fractional_uncertainty = None
+                self.min_temp = None
+                self.max_temp = None
+            
+            self.units = Database._TP_UNITS[key]
 
-    def __call__(self, T: float) -> float:
+    def __call__(self, temp):
         if self.min_temp is not None and self.max_temp is not None:
-            if not self.min_temp <= T <= self.max_temp:
-                warnings.warn(f"Temperature {T} is out of the applicable range ({self.min_temp}, {self.max_temp}) for this property.", UserWarning)
+            if temp < self.min_temp or temp > self.max_temp:
+                warnings.warn(
+                    f"Temperature {temp} is outside the valid range [{self.min_temp}, {self.max_temp}] for {self.key}"
+                , UserWarning)
+        unc = self.fractional_uncertainty if self.fractional_uncertainty is not None else 0.0
         if self.key == 'liquid_heat_capacity':
             MW = self.salt['molecular_weight']
-            return Database._TP_FUNCTIONS[self.key](MW, *self.coef_array, T)
+            return ufloat(Database._TP_FUNCTIONS[self.key](MW, *self.coef_array, temp), unc)
         else:
-            return Database._TP_FUNCTIONS[self.key](*self.coef_array, T)
+            return ufloat(Database._TP_FUNCTIONS[self.key](*self.coef_array, temp), unc)
 
     def __add__(self, other):
-        if not isinstance(other, ThermoFunction):
+        if isinstance(other, ThermoFunction):
+            new_min_temp = max(self.min_temp, other.min_temp) if self.min_temp is not None and other.min_temp is not None else None
+            new_max_temp = min(self.max_temp, other.max_temp) if self.max_temp is not None and other.max_temp is not None else None
+            
+            def new_func(temp):
+                return self(temp) + other(temp)
+            
+            new_tf = ThermoFunction(self.salt, self.key)
+            new_tf.min_temp = new_min_temp
+            new_tf.max_temp = new_max_temp
+            new_tf.__call__ = new_func
+            return new_tf
+        else:
             return NotImplemented
 
-        def new_thermo_function(T: float) -> float:
-            return self(T) + other(T)
+    def __radd__(self, other):
+        return self.__add__(other)
 
-        def combined_uncertainty(self_val, other_val, self_unc, other_unc):
-            if self_unc is None and other_unc is None:
-                return None
-            self_var = (self_unc * self_val)**2 if self_unc is not None else 0
-            other_var = (other_unc * other_val)**2 if other_unc is not None else 0
-            combined_var = self_var + other_var
-            combined_std_dev = math.sqrt(combined_var)
-            combined_value = self_val + other_val
-            return combined_std_dev / combined_value if combined_value != 0 else None
-        
-        new_min_temp = max(self.min_temp, other.min_temp) if None not in (self.min_temp, other.min_temp) else None
-        new_max_temp = min(self.max_temp, other.max_temp) if None not in (self.max_temp, other.max_temp) else None
+    def __mul__(self, other):
+        if isinstance(other, (int, float)):
+            def new_func(temp):
+                return self(temp) * other
+            
+            new_tf = ThermoFunction(self.salt, self.key)
+            new_tf.min_temp = self.min_temp
+            new_tf.max_temp = self.max_temp
+            new_tf.__call__ = new_func
+            return new_tf
+        else:
+            return NotImplemented
 
-        # Create a new ThermoFunction object with combined properties
-        new_obj = ThermoFunction(self.salt, self.key, new_min_temp, new_max_temp)
-        new_obj.__call__ = lambda T: new_thermo_function(T)
-        new_obj.units = self.units  # Assuming the units are the same for both functions
+    def __rmul__(self, other):
+        return self.__mul__(other)
+
+    def __truediv__(self, other):
+        if isinstance(other, (int, float)):
+            def new_func(temp):
+                return self(temp) / other
+            
+            new_tf = ThermoFunction(self.salt, self.key)
+            new_tf.min_temp = self.min_temp
+            new_tf.max_temp = self.max_temp
+            new_tf.__call__ = new_func
+            return new_tf
+        else:
+            return NotImplemented
+
+    def __rtruediv__(self, other):
+        if isinstance(other, (int, float)):
+            def new_func(temp):
+                return other / self(temp)
+            
+            new_tf = ThermoFunction(self.salt, self.key)
+            new_tf.min_temp = self.min_temp
+            new_tf.max_temp = self.max_temp
+            new_tf.__call__ = new_func
+            return new_tf
+        else:
+            return NotImplemented
+
+    def reciprocal(self):
+        def new_func(temp):
+            return 1 / self(temp)
         
-        # Define how to propagate uncertainties for the combined function
-        new_obj.fractional_uncertainty = lambda T: combined_uncertainty(
-            self(T),
-            other(T),
-            self.fractional_uncertainty(T) if callable(self.fractional_uncertainty) else self.fractional_uncertainty,
-            other.fractional_uncertainty(T) if callable(other.fractional_uncertainty) else other.fractional_uncertainty
-        )
+        new_tf = ThermoFunction(self.salt, self.key)
+        new_tf.min_temp = self.min_temp
+        new_tf.max_temp = self.max_temp
+        new_tf.__call__ = new_func
+        return new_tf
+
+    def log(self):
+        def new_func(temp):
+            return math.log(self(temp))
         
-        return new_obj
+        new_tf = ThermoFunction(self.salt, self.key)
+        new_tf.min_temp = self.min_temp
+        new_tf.max_temp = self.max_temp
+        new_tf.__call__ = new_func
+        return new_tf
+
+    def exp(self):
+        def new_func(temp):
+            return math.exp(self(temp))
+        
+        new_tf = ThermoFunction(self.salt, self.key)
+        new_tf.min_temp = self.min_temp
+        new_tf.max_temp = self.max_temp
+        new_tf.__call__ = new_func
+        return new_tf
+
 
 @docstring_injector
 class Database:
@@ -167,9 +250,8 @@ class Database:
     # ------------------------------------------------------------------------------------------
     
     @staticmethod
-    def IDEAL_VISCOSITY(tp_of_endmembers: List[Callable[[float], float]], composition_endmembers: list, \
-                        mw_endmembers: list, T:float) -> float:
-        """Calculate the ideal viscosity for a given temperature.
+    def IDEAL_VISCOSITY(tp_of_endmembers: List[ThermoFunction], composition_endmembers: list) -> ThermoFunction:
+        """Calculate the ideal viscosity function.
 
         The ideal viscosity is calculated using the logarithmic mixing rule:
 
@@ -178,12 +260,12 @@ class Database:
         where \\mu_id is the ideal viscosity, x_i is the mole fraction of
         the ith component, and \\mu_i is the viscosity of the ith component."""
 
-        return exp( sum( [ x_i * log( mu_i(T) ) for mu_i, x_i  in zip(tp_of_endmembers, composition_endmembers)] ) )
-    
+        log_viscosities = [x_i * mu_i.log() for mu_i, x_i in zip(tp_of_endmembers, composition_endmembers)]
+        return np.sum(log_viscosities).exp()
+
     @staticmethod
-    def IDEAL_DENSITY(tp_of_endmembers: List[Callable[[float], float]], composition_endmembers: list, \
-                      mw_endmembers: list, T:float) -> float:
-        """Calculate the ideal density for a given temperature.
+    def IDEAL_DENSITY(tp_of_endmembers: List[ThermoFunction], composition_endmembers: list, mw_endmembers: list) -> ThermoFunction:
+        """Calculate the ideal density function.
 
         The ideal density is calculated using the ideal mixing rule:
 
@@ -192,16 +274,15 @@ class Database:
         where \\rho_id is the ideal density, x_i is the mole fraction of the ith component,
         M_i is the molecular weight of each component (in kg/mol), and \\rho_i is the density of the ith component."""
 
-        numerator_sum = sum( [ x_i * M_i*ureg('g/mol').to('kg/mol').magnitude \
-                               for x_i, M_i in zip(composition_endmembers, mw_endmembers)] )
-        denomenator_sum = sum( [ x_i * M_i*ureg('g/mol').to('kg/mol').magnitude / rho_i(T) \
-                                 for rho_i, x_i, M_i in zip(tp_of_endmembers, composition_endmembers, mw_endmembers)] )
-        return numerator_sum / denomenator_sum
-               
+        weighted_densities = [x_i * (M_i / rho_i) for rho_i, x_i, M_i in zip(tp_of_endmembers, composition_endmembers, mw_endmembers)]
+        print(weighted_densities)
+        summed_weighted_densities = np.sum(weighted_densities)
+        total_mass_fraction = np.sum([x_i * M_i for x_i, M_i in zip(composition_endmembers, mw_endmembers)])
+        return total_mass_fraction / summed_weighted_densities
+
     @staticmethod
-    def IDEAL_THERMAL_CONDUCTIVITY(tp_of_endmembers: List[Callable[[float], float]], composition_endmembers: list, \
-                                   mw_endmembers: list, T:float) -> float:
-        """Calculate the ideal thermal conductivity for a given temperature.
+    def IDEAL_THERMAL_CONDUCTIVITY(tp_of_endmembers: List[ThermoFunction], composition_endmembers: list) -> ThermoFunction:
+        """Calculate the ideal thermal conductivity function.
 
         The ideal thermal conductivity is calculated using the following rule:
 
@@ -209,13 +290,10 @@ class Database:
 
         where k_id is the ideal thermal conductivity, x_i is the mole fraction of
         the ith component, and k_i is the thermal conductivity of the ith component."""
-    
-        return sum( [ x_i * k_i(T) for k_i, x_i in zip(tp_of_endmembers, composition_endmembers)] )
-    
-    # Might replace this later with direct calls to thermochimica, but for now use a crude additivity law
+        return np.sum([x_i * k_i for k_i, x_i in zip(tp_of_endmembers, composition_endmembers)])
+
     @staticmethod
-    def IDEAL_HEAT_CAPACITY(tp_of_endmembers: List[Callable[[float], float]], composition_endmembers: list, \
-                                   mw_endmembers: list, T:float) -> float:
+    def IDEAL_HEAT_CAPACITY(tp_of_endmembers: List[ThermoFunction], composition_endmembers: list) -> ThermoFunction:
         """Calculate the ideal heat capacity for a given temperature.
 
         The ideal heat capacity is calculated using the following rule:
@@ -224,8 +302,8 @@ class Database:
 
         where c_id is the ideal heat capacity, x_i is the mole fraction of
         the ith component, and c_i is the heat capacity of the ith component."""
-        print([k_i(T) for k_i in tp_of_endmembers])
-        return sum( [ x_i * c_i(T) for c_i, x_i in zip(tp_of_endmembers, composition_endmembers)] )
+
+        return np.sum([x_i * c_i for c_i, x_i in zip(tp_of_endmembers, composition_endmembers)])
 
     IDEAL_FUNCTIONS = {
         'viscosity': IDEAL_VISCOSITY,
@@ -314,17 +392,11 @@ class Database:
                     # Now, for each of the thermophysical properties with expansion functions, replace the array with a function
                     for tp_key in [ key for key in Database._TP_FUNCTIONS.keys() if key in parsed_row.keys() ]:
                         if parsed_row[tp_key] is not None: # Can be none if tp_key is the wrong viscosity functionalization
-                            if isinstance(parsed_row[tp_key][1], float):
-                                # Just a single number, then it's an uncertainty
-                                tmin, tmax = (None, None)
-                                uncertainty = parsed_row[tp_key][1]/100 # Given as a percent in the MSTDB-TP
-                            else:
-                                uncertainty = None
-                                tmin, tmax = parsed_row[tp_key][1] if parsed_row[tp_key][1] is not None else (None, None)
-                            parsed_row[tp_key] = ThermoFunction(parsed_row, tp_key, tmin, tmax, uncertainty)
+                            parsed_row[tp_key] = ThermoFunction(parsed_row, tp_key)
                         if 'viscosity' in tp_key:
                             parsed_row['viscosity'] = parsed_row.pop(tp_key)
                     data.update({composition_dict: parsed_row})
+                ThermoFunction.has_been_parsed = True
             return data
         
         def _parse_mstdb_tp_rk(self, mstdb_tp_rk_path):
@@ -606,7 +678,11 @@ class Database:
         composition_endmembers = [ composition / sum(compositions_with_data) for composition in  compositions_with_data]
 
 
-        ideal_property = Database.IDEAL_ESTIMATE(thermophysical_property, tp_of_endmembers, composition_endmembers, mw_endmembers)
+        ideal_property = Database.IDEAL_FUNCTIONS[thermophysical_property](tp_of_endmembers, composition_endmembers) \
+                          if thermophysical_property != 'density' else \
+                          Database.IDEAL_FUNCTIONS[thermophysical_property](tp_of_endmembers, composition_endmembers, mw_endmembers)
+
+        print(ideal_property(1000))
 
         if thermophysical_property == 'density':
             # --------------------------------------------------
@@ -668,4 +744,4 @@ example_salt = frozendict({'AlCl3': 1.0})
 # test_salt = {'NaCl': 0.25, 'UCl3': 0.25, 'PuCl3': 0.25, 'KCl': 0.20, 'ZrCl4': 0.05}
 # test_salt = {'LiCl': 0.5, 'KCl': 0.25, 'PuCl3': 0.25}
 test_salt = {'LiCl': 0.5, 'KCl': 0.5}
-print(db.get_tp('density', test_salt))
+print(db.get_tp('thermal_conductivity', test_salt))
