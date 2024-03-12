@@ -65,7 +65,7 @@ class ArbitraryThermoFunction:
         result = self.func(temp)
         try:
             return ufloat(result, unc)
-        except:
+        except: # If result itself is type ufloat, the above will error
             return result
 
     def __add__(self, other):
@@ -273,7 +273,6 @@ class Database:
         M_i is the molecular weight of each component (in kg/mol), and \\rho_i is the density of the ith component."""
 
         weighted_densities = [x_i * (M_i / rho_i) for rho_i, x_i, M_i in zip(tp_of_endmembers, composition_endmembers, mw_endmembers)]
-        print(weighted_densities)
         summed_weighted_densities = np.sum(weighted_densities)
         total_mass_fraction = np.sum([x_i * M_i for x_i, M_i in zip(composition_endmembers, mw_endmembers)])
         return total_mass_fraction / summed_weighted_densities
@@ -349,7 +348,6 @@ class Database:
 
         def __init__(self, outer_instance):
             self._outer = outer_instance
-            print(self._outer)
             pass
 
         def _parse_mstdb_tp(self, mstdb_tp_path: Path) -> Dict:
@@ -679,10 +677,9 @@ class Database:
             for binary_subsystem in all_binary_sybsystems:
                 # Calculate the contribution to the excess density from each binary subsystem
                 excess_density_contribution = self._excess_density_contribution(binary_subsystem)
+                ideal_property += excess_density_contribution
 
-            pass
-        else:
-            return ideal_property
+        return ideal_property
         
 
     def _excess_density_contribution(self, binary_subsystem: dict):
@@ -701,10 +698,9 @@ class Database:
                 running_sum += L*(x_1-x_2)**index
             return x_1*x_2*running_sum*ureg('g/cm^3').to('kg/m^3').magnitude
         # Now set temperature range
-        excess_density_contribution.min_temp = tmin
-        excess_density_contribution.max_temp = tmax
+        thermo_func = ArbitraryThermoFunction(excess_density_contribution, tmin, tmax, units='kg/m^3')
 
-        return excess_density_contribution
+        return thermo_func
 
 # Example usage:
 mstdb_tp_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Properties.csv')
@@ -713,7 +709,7 @@ mstdb_tp_rk_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Prope
 db = Database(mstdb_tp_path, mstdb_tp_rk_path)
 example_salt = frozendict({'AlCl3': 1.0})
 
-# test_salt = {'NaCl': 0.25, 'UCl3': 0.25, 'PuCl3': 0.25, 'KCl': 0.20, 'ZrCl4': 0.05}
+test_salt = {'NaCl': 0.25, 'UCl3': 0.25, 'PuCl3': 0.25, 'KCl': 0.20, 'ZrCl4': 0.05}
 # test_salt = {'LiCl': 0.5, 'KCl': 0.25, 'PuCl3': 0.25}
-test_salt = {'LiCl': 0.5, 'KCl': 0.5}
-print(db.get_tp('viscosity', test_salt)(1000))
+# test_salt = {'LiCl': 0.5, 'KCl': 0.5}
+print(db.get_tp('density', test_salt)(1000))
