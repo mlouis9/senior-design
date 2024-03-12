@@ -312,30 +312,6 @@ class Database:
         'liquid_heat_capacity': IDEAL_HEAT_CAPACITY
     }
 
-    @staticmethod
-    def IDEAL_ESTIMATE(thermophysical_property: str, tp_of_endmembers: List[Callable[[float], float]], \
-                       composition_endmembers: list, mw_endmembers: list) -> Callable[[float], float]:
-        """This function estimates the desired thermophysical property of a higher order salt using the ideal mixing assumption"""
-
-        def ideal_estimate(T: float) -> float:
-            return Database.IDEAL_FUNCTIONS[thermophysical_property](tp_of_endmembers, composition_endmembers, mw_endmembers, T)
-        
-        # Assume all functions have the same units
-        ideal_estimate.units = tp_of_endmembers[0].units
-
-        # If any of the constituient functions have applicable temperature ranges with None endpoints, then
-        # the composite function should as well, otherwise it is the intersection of each of the applicable
-        # ranges
-        if any([(tp_endmember.min_temp is None) or (tp_endmember.max_temp is None) \
-                for tp_endmember in tp_of_endmembers]):
-            ideal_estimate.min_temp = None
-            ideal_estimate.max_temp = None
-        else:
-            ideal_estimate.min_temp = max([tp_endmember.min_temp for tp_endmember in tp_of_endmembers])
-            ideal_estimate.max_temp = min([tp_endmember.max_temp for tp_endmember in tp_of_endmembers])
-            
-        return ideal_estimate
-
     _TP_UNITS = {
         'viscosity_exp': 'Pa*s',
         'viscosity_base10': 'Pa*s',
