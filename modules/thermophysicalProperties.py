@@ -8,7 +8,7 @@ import pint
 from numpy import exp, power
 from itertools import combinations
 from uncertainties import ufloat, unumpy
-import uncertainties
+import matplotlib.pyplot as plt
 import numpy as np
 
 """ This is a module for reading and calculating thermophysical properties from the MSTDB using ideal estimations (e.g. 
@@ -701,15 +701,3 @@ class Database:
         thermo_func = ArbitraryThermoFunction(excess_density_contribution, tmin, tmax, units='kg/m^3')
 
         return thermo_func
-
-# Example usage:
-mstdb_tp_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Properties.csv')
-mstdb_tp_rk_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Properties_2.1.0_RK.csv')
-
-db = Database(mstdb_tp_path, mstdb_tp_rk_path)
-example_salt = frozendict({'AlCl3': 1.0})
-
-test_salt = {'NaCl': 0.25, 'UCl3': 0.25, 'PuCl3': 0.25, 'KCl': 0.20, 'ZrCl4': 0.05}
-# test_salt = {'LiCl': 0.5, 'KCl': 0.25, 'PuCl3': 0.25}
-# test_salt = {'LiCl': 0.5, 'KCl': 0.5}
-print(db.get_tp('density', test_salt)(1000))
