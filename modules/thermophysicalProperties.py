@@ -6,6 +6,7 @@ from frozendict import frozendict
 import warnings
 import pint
 from numpy import pi, sqrt, log, exp, log10, power
+from itertools import combinations
 
 """ This is a module for reading and calculating thermophysical properties from the MSTDB using ideal estimations (e.g. 
 additivity of molar volumes) and the RK expansion for estimating the effects nonideal mixing.
@@ -91,6 +92,14 @@ class Database:
         # Returns heat capacity in SI units, i.e. J/(kg * K), hence why we have to divide
         # by the molecular weight in g/mol
         return ( ( A + B*T + C/T**2 + D*T**2 )/(MW*ureg('g/mol').to('kg/mol')) ).magnitude
+    
+    _TP_FUNCTIONS = {
+        'viscosity_exp': VISCOSITY_EXP,
+        'viscosity_base10': VISCOSITY_BASE_10,
+        'density': DENSITY,
+        'thermal_conductivity': THERMAL_CONDUCTIVITY,
+        'liquid_heat_capacity': HEAT_CAPACITY
+    }
 
     # ------------------------------------------------------------------------------------------
     # These are the functional expansions of the thermophysical properties of higher order salt
@@ -188,14 +197,6 @@ class Database:
             ideal_estimate.max_temp = min([tp_endmember.max_temp for tp_endmember in tp_of_endmembers])
             
         return ideal_estimate
-
-    _TP_FUNCTIONS = {
-        'viscosity_exp': VISCOSITY_EXP,
-        'viscosity_base10': VISCOSITY_BASE_10,
-        'density': DENSITY,
-        'thermal_conductivity': THERMAL_CONDUCTIVITY,
-        'liquid_heat_capacity': HEAT_CAPACITY
-    }
 
     _TP_UNITS = {
         'viscosity_exp': 'Pa*s',
@@ -525,6 +526,10 @@ class Database:
         # First perform checks on the input to make sure it's valid
         # ----------------------------------------------------------
 
+        # Verify that the requested thermophysical property is valid
+        assert thermophysical_property in Database._UNIQUE_TP_NAMES, (f"The thermophysical property {thermophysical_property} "
+                                                                      f"is not one of the valid options: {Database._UNIQUE_TP_NAMES}")
+
         # Check mole fractions of endmembers add to 1
         assert sum(composition_dict.values()) ==1, ("The mole fractions of the endmembers do not sum to 1, this is an "
                                                     "invalid salt mixture")
@@ -548,7 +553,6 @@ class Database:
         number_of_endmembers_with_data = sum(endmembers_data_dict.values())
         assert number_of_endmembers_with_data != 0, (f"None of the endmembers have any data for the requested thermophysical"
                                                      f"property {thermophysical_property}.")  
-
 
         # ---------------------------------------------------------------------------
         # Now perform ideal property estimation (this will be refined with RK later)
@@ -575,7 +579,55 @@ class Database:
 
         ideal_property = Database.IDEAL_ESTIMATE(thermophysical_property, tp_of_endmembers, composition_endmembers, mw_endmembers)
 
-        print(f'TEST {ideal_property(1000)}')
+        if thermophysical_property == 'density':
+            # --------------------------------------------------
+            # Perform a redlich kister expansion on the density
+            # --------------------------------------------------
+
+            # Get all relevant binary subsystems for which there are rk expansion coefficients
+            all_binary_sybsystems = list(combinations(composition_dict, 2)) # Gives a list of pairs of keys, want a list of composition dicts
+            
+            # Now check which binary subsystems have rk data
+            def rk_data_is_available(binary_subsystem):
+                database_key = frozenset({*binary_subsystem})
+                return database_key in self.rk.keys()
+            
+            all_binary_sybsystems = [binary_subsystem for binary_subsystem in all_binary_sybsystems \
+                                     if rk_data_is_available(binary_subsystem)]
+
+            # Now convert to a dictionary with compositions
+            all_binary_sybsystems = [ {endmember: composition_dict[endmember] for endmember in combination } \
+                                     for combination in all_binary_sybsystems ]
+            
+            for binary_subsystem in all_binary_sybsystems:
+                # Calculate the contribution to the excess density from each binary subsystem
+                excess_density_contribution = self._excess_density_contribution(binary_subsystem)
+
+            pass
+        else:
+            return ideal_property
+        
+
+    def _excess_density_contribution(self, binary_subsystem: dict):
+        """This function returns a function expressing the contribution of a given binary subsystem to the
+        excess density term as a function of temperature"""
+        x_1, x_2 = binary_subsystem.values()
+        component_1, component_2 = binary_subsystem.keys()
+        database_key = frozenset({component_1, component_2})
+        coef_array, applicable_range = self.rk[database_key]
+        tmin, tmax = applicable_range
+        def excess_density_contribution(T: float):
+            running_sum = 0
+            for index, coefs in enumerate(coef_array):
+                A, B = coefs
+                L = A + B*T
+                running_sum += L*(x_1-x_2)**index
+            return x_1*x_2*running_sum*ureg('g/cm^3').to('kg/m^3').magnitude
+        # Now set temperature range
+        excess_density_contribution.min_temp = tmin
+        excess_density_contribution.max_temp = tmax
+
+        return excess_density_contribution
 
 # Example usage:
 mstdb_tp_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Properties.csv')
@@ -585,5 +637,5 @@ db = Database(mstdb_tp_path, mstdb_tp_rk_path)
 example_salt = frozendict({'AlCl3': 1.0})
 
 # test_salt = {'NaCl': 0.25, 'UCl3': 0.25, 'PuCl3': 0.25, 'KCl': 0.20, 'ZrCl4': 0.05}
-test_salt = {'LiCl': 0.5, 'KCl': 0.5}
-print(db.get_tp('viscosity', test_salt))
+test_salt = {'LiCl': 0.5, 'KCl': 0.25, 'PuCl3': 0.25}
+print(db.get_tp('density', test_salt))
