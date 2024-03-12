@@ -84,7 +84,7 @@ class Database:
     @staticmethod
     def THERMAL_CONDUCTIVITY(A, B, T):
         # Returns thermal conducitivty in SI units
-        return A - B*T
+        return A + B*T
     
     @staticmethod
     def HEAT_CAPACITY(MW, A, B, C, D, T):
@@ -98,7 +98,8 @@ class Database:
     # ------------------------------------------------------------------------------------------
     
     @staticmethod
-    def IDEAL_VISCOSITY(tp_of_endmembers: List[Callable[[float], float]], composition_endmembers: list, mw_endmembers: list, T:float) -> float:
+    def IDEAL_VISCOSITY(tp_of_endmembers: List[Callable[[float], float]], composition_endmembers: list, \
+                        mw_endmembers: list, T:float) -> float:
         """Calculate the ideal viscosity for a given temperature.
 
         The ideal viscosity is calculated using the logarithmic mixing rule:
@@ -107,11 +108,13 @@ class Database:
 
         where \\mu_id is the ideal viscosity, x_i is the mole fraction of
         the ith component, and \\mu_i is the viscosity of the ith component."""
-        return exp( sum( [ x_i * log( mu_i(T) ) for x_i, mu_i in zip(tp_of_endmembers, composition_endmembers)] ) )
+
+        return exp( sum( [ x_i * log( mu_i(T) ) for mu_i, x_i  in zip(tp_of_endmembers, composition_endmembers)] ) )
     
     @staticmethod
-    def IDEAL_DENSITY(tp_of_endmembers: List[Callable[[float], float]], composition_endmembers: list, mw_endmembers: list, T:float) -> float:
-        """Calculate the ideal viscosity for a given temperature.
+    def IDEAL_DENSITY(tp_of_endmembers: List[Callable[[float], float]], composition_endmembers: list, \
+                      mw_endmembers: list, T:float) -> float:
+        """Calculate the ideal density for a given temperature.
 
         The ideal density is calculated using the ideal mixing rule:
 
@@ -119,17 +122,47 @@ class Database:
 
         where \\rho_id is the ideal density, x_i is the mole fraction of the ith component,
         M_i is the molecular weight of each component (in kg/mol), and \\rho_i is the density of the ith component."""
+
         numerator_sum = sum( [ x_i * M_i*ureg('g/mol').to('kg/mol').magnitude \
                                for x_i, M_i in zip(composition_endmembers, mw_endmembers)] )
         denomenator_sum = sum( [ x_i * M_i*ureg('g/mol').to('kg/mol').magnitude / rho_i(T) \
                                  for rho_i, x_i, M_i in zip(tp_of_endmembers, composition_endmembers, mw_endmembers)] )
-        print([rho_i(T) for rho_i in tp_of_endmembers])
         return numerator_sum / denomenator_sum
                
+    @staticmethod
+    def IDEAL_THERMAL_CONDUCTIVITY(tp_of_endmembers: List[Callable[[float], float]], composition_endmembers: list, \
+                                   mw_endmembers: list, T:float) -> float:
+        """Calculate the ideal thermal conductivity for a given temperature.
+
+        The ideal thermal conductivity is calculated using the following rule:
+
+            k_id = \\sum_(i=1)^n x_i*k_i
+
+        where k_id is the ideal thermal conductivity, x_i is the mole fraction of
+        the ith component, and k_i is the thermal conductivity of the ith component."""
+    
+        return sum( [ x_i * k_i(T) for k_i, x_i in zip(tp_of_endmembers, composition_endmembers)] )
+    
+    # Might replace this later with direct calls to thermochimica, but for now use a crude additivity law
+    @staticmethod
+    def IDEAL_HEAT_CAPACITY(tp_of_endmembers: List[Callable[[float], float]], composition_endmembers: list, \
+                                   mw_endmembers: list, T:float) -> float:
+        """Calculate the ideal heat capacity for a given temperature.
+
+        The ideal heat capacity is calculated using the following rule:
+
+            c_id = \\sum_(i=1)^n x_i*c_i
+
+        where c_id is the ideal heat capacity, x_i is the mole fraction of
+        the ith component, and c_i is the heat capacity of the ith component."""
+        print([k_i(T) for k_i in tp_of_endmembers])
+        return sum( [ x_i * c_i(T) for c_i, x_i in zip(tp_of_endmembers, composition_endmembers)] )
 
     IDEAL_FUNCTIONS = {
         'viscosity': IDEAL_VISCOSITY,
-        'density': IDEAL_DENSITY
+        'density': IDEAL_DENSITY,
+        'thermal_conductivity': IDEAL_THERMAL_CONDUCTIVITY,
+        'liquid_heat_capacity': IDEAL_HEAT_CAPACITY
     }
 
     @staticmethod
@@ -248,7 +281,12 @@ class Database:
                 if tmin is not None and tmax is not None: # A valid applicable temperature range
                     if not tmin <= T <= tmax:
                         warnings.warn(f"Temperature {T} is out of the applicable range ({tmin}, {tmax}) for this property.", UserWarning)
-                return Database._TP_FUNCTIONS[key](*coef_array, T)
+                if key == 'liquid_heat_capacity':
+                    # Also need to pass MW
+                    MW = salt['molecular_weight']
+                    return Database._TP_FUNCTIONS[key](MW, *coef_array, T)
+                else:
+                    return Database._TP_FUNCTIONS[key](*coef_array, T)
             
             # Now set attributes
             thermo_function.min_temp = tmin # May be None
@@ -548,4 +586,4 @@ example_salt = frozendict({'AlCl3': 1.0})
 
 # test_salt = {'NaCl': 0.25, 'UCl3': 0.25, 'PuCl3': 0.25, 'KCl': 0.20, 'ZrCl4': 0.05}
 test_salt = {'LiCl': 0.5, 'KCl': 0.5}
-print(db.get_tp('density', test_salt))
+print(db.get_tp('viscosity', test_salt))
