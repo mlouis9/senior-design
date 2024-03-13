@@ -61,8 +61,8 @@ class ArbitraryThermoFunction:
                 warnings.warn(
                     f"Temperature {temp} is outside the valid range [{self.min_temp}, {self.max_temp}]"
                 , UserWarning)
-        unc = self.fractional_uncertainty if self.fractional_uncertainty is not None else 0.0
         result = self.func(temp)
+        unc = result*self.fractional_uncertainty if self.fractional_uncertainty is not None else 0.0
         try:
             return ufloat(result, unc)
         except: # If result itself is type ufloat, the above will error
@@ -159,10 +159,14 @@ class ThermoFunction(ArbitraryThermoFunction):
             coef_array = salt[key][0]
             
             if isinstance(salt[key][1], tuple):
+                if len(salt[key]) == 3:
+                    print(salt[key][2])
+                    fractional_uncertainty = salt[key][2]/100
+                else:
+                    fractional_uncertainty = None
                 min_temp, max_temp = salt[key][1]
-                fractional_uncertainty = None
             elif isinstance(salt[key][1], float):
-                fractional_uncertainty = salt[key][1]
+                fractional_uncertainty = salt[key][1]/100
                 min_temp = None
                 max_temp = None
             else:
@@ -418,7 +422,8 @@ class Database:
             self._second_row = next(csvfile).strip().split(',')
 
             csvfile.seek(0) # Reset the cursor of the csv
-            for row_index, row in enumerate(csvfile):
+            lines = csvfile.readlines()
+            for row_index, row in enumerate(lines):
                 if row_index in [0,1,2]:
                     continue # Skip header and subheader
                 index_of_last_empty_col = -99
@@ -442,7 +447,7 @@ class Database:
                         reader[row_index-3][key_of_last_nonempty_col][0].append(append_val)
                     else:
                         if index_of_last_empty_col == col_index - 1:
-                            # Add temp range to the end of the list
+                            # Add temp range and uncertainty to the end of the list
                             last_tp_is_viscosity =  key_of_last_nonempty_col in [Database._CSV_HEADERS['viscosity_exp'], \
                                                                                  Database._CSV_HEADERS['viscosity_base10']]
                             last_tp_coef_array = reader[row_index -3][key_of_last_nonempty_col][0]
@@ -453,11 +458,14 @@ class Database:
                                     reader[row_index -3][key_of_last_nonempty_col] = None
                                 else:
                                     # Otherwise add on the temperature range and convert nones to zeros in the array
-                                    append_val = self._parse_temp_range(col)
+                                    temp_range = self._parse_temp_range(col)
+                                    uncertainty = self._parse_temp_range(self._smart_split(lines[row_index].strip(), delimiter=',')[col_index + 1])
                                 
                                     reader[row_index -3][key_of_last_nonempty_col][0] = [ 0 if coef is None else coef \
                                                                                          for coef in last_tp_coef_array ]
-                                    reader[row_index -3][key_of_last_nonempty_col][1] = append_val
+                                    reader[row_index -3][key_of_last_nonempty_col][1] = temp_range
+                                    if uncertainty is not None:
+                                        reader[row_index -3][key_of_last_nonempty_col].append(uncertainty)
                             else: # Last tp is viscosity
                                 append_val = self._parse_temp_range(col)
 
@@ -569,7 +577,10 @@ class Database:
                     else:
                         append_val = tuple( float(subval) for subval in col.split('-') )
                 else:
-                    append_val = float(col) # An uncertainty, in %
+                    try:
+                        append_val = float(col) # An uncertainty, in %
+                    except:
+                        append_val = None
             return append_val
 
     def __init__(self, mstdb_tp_path: Path, mstdb_tp_rk_path: Path) -> None:
