@@ -10,7 +10,10 @@ mstdb_tp_rk_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Prope
 
 db = Database(mstdb_tp_path, mstdb_tp_rk_path)
 
-# TEST
+# ----------------------
+# Test case 1: KCl-NaCl
+# ----------------------
+
 mole_frac_NaCl = np.linspace(0,1,10)
 temps = [943, 1033, 1123, 1213, 1303]
 for temp in temps:
