@@ -352,7 +352,7 @@ class Database:
     }
 
     # Composition tolerance for selecting higher order system directly from the database (without performing property estimation)
-    COMPOSITION_TOLERANCE = 0.025
+    COMPOSITION_TOLERANCE = 0.05
 
     class _Parsers:
         """This class contains all of the parsers that are necessary for processing the .csv files. It's easier
@@ -651,12 +651,14 @@ class Database:
 
         # Check if the database has a binary/ternary composition close to the one given
         input_compositions = np.array([ composition for composition in composition_dict.values() if composition != 0])
-        input_composition_keys = [ composition for composition in composition_dict.keys() if composition != 0]
+        input_composition_keys = [ key for key in composition_dict.keys() if composition_dict[key] != 0]
         keys_with_correct_endmembers = [key for key in self.data.keys() if list(key.keys()) == input_composition_keys ]
         for key_dict in keys_with_correct_endmembers:
             key_compositions = np.array([key_dict[key] for key in input_composition_keys])
             thermophysical_property_exists_in_db = self.data[key_dict][thermophysical_property] is not None
-            if np.all(np.isclose(key_compositions, input_compositions, Database.COMPOSITION_TOLERANCE)) and thermophysical_property_exists_in_db:
+            print(key_dict)
+            print(key_compositions, input_compositions)
+            if np.all(np.isclose(key_compositions, input_compositions, atol=Database.COMPOSITION_TOLERANCE)) and thermophysical_property_exists_in_db:
                 return self.data[key_dict][thermophysical_property]
 
         # ---------------------------------------------------------------------------
