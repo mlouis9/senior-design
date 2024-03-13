@@ -160,7 +160,6 @@ class ThermoFunction(ArbitraryThermoFunction):
             
             if isinstance(salt[key][1], tuple):
                 if len(salt[key]) == 3:
-                    print(salt[key][2])
                     fractional_uncertainty = salt[key][2]/100
                 else:
                     fractional_uncertainty = None
