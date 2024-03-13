@@ -4,5 +4,7 @@ This directory contains all of the calculations relevant to the optimization of 
 ## Table of Contents
 
 - [corrosionCalcs](corrosionCalcs/README.md)
+- [thermophysicalProperties](thermophysicalProperties/README.md)
+  - [benchmarking](thermophysicalProperties/benchmarking/README.md)
 - [benchmarking](benchmarking/README.md)
 
