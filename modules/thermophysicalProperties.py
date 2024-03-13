@@ -62,11 +62,14 @@ class ArbitraryThermoFunction:
                     f"Temperature {temp} is outside the valid range [{self.min_temp}, {self.max_temp}]"
                 , UserWarning)
         result = self.func(temp)
-        unc = result*self.fractional_uncertainty if self.fractional_uncertainty is not None else 0.0
+        unc = abs(result*self.fractional_uncertainty) if self.fractional_uncertainty is not None else 0.0
         try:
             return ufloat(result, unc)
-        except: # If result itself is type ufloat, the above will error
-            return result
+        except: # Result is already a ufloat or another non-float datatype
+            try: # When using np.sum(), results can get converted into a np array of ufloats, just use .item() to conver to ufloat
+                return result.item()
+            except: # Result is already a ufloat
+                return result
 
     def __add__(self, other):
         if isinstance(other, ArbitraryThermoFunction):
@@ -165,7 +168,10 @@ class ThermoFunction(ArbitraryThermoFunction):
                     fractional_uncertainty = None
                 min_temp, max_temp = salt[key][1]
             elif isinstance(salt[key][1], float):
-                fractional_uncertainty = salt[key][1]/100
+                if len(salt[key]) == 3: # For some reason, only one point has been given for the temp range
+                    fractional_uncertainty = salt[key][2]/100
+                else:
+                    fractional_uncertainty = salt[key][1]/100
                 min_temp = None
                 max_temp = None
             else:
@@ -345,6 +351,9 @@ class Database:
         'reference': 'Reference'
     }
 
+    # Composition tolerance for selecting higher order system directly from the database (without performing property estimation)
+    COMPOSITION_TOLERANCE = 0.025
+
     class _Parsers:
         """This class contains all of the parsers that are necessary for processing the .csv files. It's easier
         to logically group these under a helper class than to clutter the body of the class."""
@@ -466,9 +475,12 @@ class Database:
                                     if uncertainty is not None:
                                         reader[row_index -3][key_of_last_nonempty_col].append(uncertainty)
                             else: # Last tp is viscosity
-                                append_val = self._parse_temp_range(col)
+                                temp_range = self._parse_temp_range(col)
+                                uncertainty = self._parse_temp_range(self._smart_split(lines[row_index].strip(), delimiter=',')[col_index + 1])
 
-                                reader[row_index -3][key_of_last_nonempty_col][1] = append_val
+                                reader[row_index -3][key_of_last_nonempty_col][1] = temp_range
+                                if uncertainty is not None:
+                                    reader[row_index -3][key_of_last_nonempty_col].append(uncertainty)
 
                         key_of_last_nonempty_col = headers[col_index]
 
@@ -636,6 +648,16 @@ class Database:
         number_of_endmembers_with_data = sum(endmembers_data_dict.values())
         assert number_of_endmembers_with_data != 0, (f"None of the endmembers have any data for the requested thermophysical"
                                                      f"property {thermophysical_property}.")  
+
+        # Check if the database has a binary/ternary composition close to the one given
+        input_compositions = np.array([ composition for composition in composition_dict.values() if composition != 0])
+        input_composition_keys = [ composition for composition in composition_dict.keys() if composition != 0]
+        keys_with_correct_endmembers = [key for key in self.data.keys() if list(key.keys()) == input_composition_keys ]
+        for key_dict in keys_with_correct_endmembers:
+            key_compositions = np.array([key_dict[key] for key in input_composition_keys])
+            thermophysical_property_exists_in_db = self.data[key_dict][thermophysical_property] is not None
+            if np.all(np.isclose(key_compositions, input_compositions, Database.COMPOSITION_TOLERANCE)) and thermophysical_property_exists_in_db:
+                return self.data[key_dict][thermophysical_property]
 
         # ---------------------------------------------------------------------------
         # Now perform ideal property estimation (this will be refined with RK later)
