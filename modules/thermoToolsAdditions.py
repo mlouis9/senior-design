@@ -952,4 +952,7 @@ def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, outpu
     calc.initRun(press, tunit, punit, plane, sum1, sum2, mint, maxt, elements_used, mass_labels, munit, tshift, fuzzy=fuzzy)
     calc.runCalc(xlo, xhi, nxstep, tlo, thi, ntstep)
 
+    # Now remove the input file
+    os.remove(input_file_name)
+
     return calc
