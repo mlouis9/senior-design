@@ -922,29 +922,6 @@ def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, outpu
     mint = tlo + tshift
     maxt = thi + tshift
 
-    # For the results to be saved properly, the thermochimica calculation must be given an output path relative to the thermochimica
-    # directory
-
-    thermochimica_outputs = (thermochimica_path / 'outputs').resolve()
-
-    # Determine the common ancestor for both paths
-    common_parts = []
-    for part1, part2 in zip(output_path.parts, thermochimica_outputs.parts):
-        if part1 == part2:
-            common_parts.append(part1)
-        else:
-            break
-
-    # Count how many steps up from thermochimica_outputs to the common ancestor
-    steps_up = len(thermochimica_outputs.parts) - len(common_parts)
-
-    # Create the relative parts consisting of the steps up and then the unique parts of output_path
-    relative_parts = ['..'] * steps_up + list(output_path.parts[len(common_parts):])
-
-    # Combine the parts into a relative path and overwrite the output path, the final result is an output path relative
-    # to the thermochimica directory
-    output_path = Path(*relative_parts)
-
     # Run the calculation
     calc = pbpd.diagram(data_file, active=True, interactivePlot=True, inputFileName=input_file_name, \
                     outputFileName=str(output_path / output_name), thermochimicaPath=thermochimica_path)
