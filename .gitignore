@@ -2,6 +2,10 @@
 *.ti
 *.json
 
+# Ignore thermochimica and mstdb-tp symlinks
+thermochimica
+mstdb-tp
+
 # Compiled Python files
 *.pyc
 *.pyo
