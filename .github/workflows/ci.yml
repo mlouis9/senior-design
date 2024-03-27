@@ -41,7 +41,10 @@ jobs:
         pip install -r requirements.txt
 
     - name: Add thermochimica/python directory to PYTHONPATH
-      run: export PYTHONPATH=~/thermochimica/python:$PYTHONPATH
+      run: echo "PYTHONPATH=$PYTHONPATH:$HOME/thermochimica/python" >> $GITHUB_ENV
+
+    - name: List directory contents
+      run: ls -alh "$HOME/thermochimica/python"
 
     - name: Run pytest
       run: pytest -s
