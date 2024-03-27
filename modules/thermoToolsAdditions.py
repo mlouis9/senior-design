@@ -925,7 +925,7 @@ def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, outpu
     # For the results to be saved properly, the thermochimica calculation must be given an output path relative to the thermochimica
     # directory
 
-    thermochimica_outputs = thermochimica_path / 'outputs'
+    thermochimica_outputs = (thermochimica_path / 'outputs').resolve()
 
     # Determine the common ancestor for both paths
     common_parts = []
@@ -951,5 +951,5 @@ def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, outpu
 
     calc.initRun(press, tunit, punit, plane, sum1, sum2, mint, maxt, elements_used, mass_labels, munit, tshift, fuzzy=fuzzy)
     calc.runCalc(xlo, xhi, nxstep, tlo, thi, ntstep)
-    # calc.processPhaseDiagramData()
+
     return calc
