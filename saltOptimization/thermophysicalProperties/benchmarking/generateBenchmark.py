@@ -6,11 +6,19 @@ from frozendict import frozendict
 import pint
 ureg = pint.UnitRegistry(auto_reduce_dimensions=True)
 from uncertainties import ufloat
+import os
+import sys
 
-script_dir = Path(__file__).resolve().parent
+# Get the script name from sys.argv
+script_name = sys.argv[0]
+
+# Get the absolute path of the script
+script_dir = Path(os.path.abspath(script_name)).resolve().parent
 
 mstdb_tp_path = script_dir / '../../../mstdb-tp/Molten_Salt_Thermophysical_Properties.csv'
-mstdb_tp_rk_path = Path('../../../mstdb-tp/Molten_Salt_Thermophysical_Properties_2.1.0_RK.csv')
+mstdb_tp_rk_path = script_dir / '../../../mstdb-tp/Molten_Salt_Thermophysical_Properties_RK.csv'
+
+print(str( script_dir / 'plots' / 'KClNaClCalculated.png' ))
 
 db = Database(mstdb_tp_path, mstdb_tp_rk_path)
 
