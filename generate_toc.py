@@ -2,7 +2,7 @@ import os
 
 # -------------------------------------------------------------------------------
 # This is a script for automatically updating the table of contents of the main
-# README file in the LEUplus directory, please don't update this unless changing
+# README file in the this repository, please don't update this unless changing
 # the TOC is your intention.
 # -------------------------------------------------------------------------------
 
