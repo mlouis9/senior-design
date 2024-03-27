@@ -5,6 +5,7 @@ This directory contains all of the calculations relevant to the optimization of 
 
 - [corrosionCalcs](corrosionCalcs/README.md)
 - [thermophysicalProperties](thermophysicalProperties/README.md)
+  - [.pytest_cache](thermophysicalProperties/.pytest_cache/README.md)
   - [benchmarking](thermophysicalProperties/benchmarking/README.md)
 - [benchmarking](benchmarking/README.md)
 
