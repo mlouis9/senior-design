@@ -9,8 +9,8 @@ from uncertainties import ufloat
 
 script_dir = Path(__file__).resolve().parent
 
-mstdb_tp_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Properties.csv')
-mstdb_tp_rk_path = Path('/home/mlouis9/mstdb-tp/Molten_Salt_Thermophysical_Properties_2.1.0_RK.csv')
+mstdb_tp_path = script_dir / '../../../mstdb-tp/Molten_Salt_Thermophysical_Properties.csv'
+mstdb_tp_rk_path = Path('../../../mstdb-tp/Molten_Salt_Thermophysical_Properties_2.1.0_RK.csv')
 
 db = Database(mstdb_tp_path, mstdb_tp_rk_path)
 
