@@ -1,20 +1,26 @@
 import thermoTools
-import modules.thermoToolsAdditions as tta
-import json
+import thermoToolsAdditions as tta
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from collections import Counter
 from thermo.mixture import Mixture
+import os, sys
+
+# Get the script name from sys.argv
+script_name = sys.argv[0]
+
+# Get the absolute path of the script
+script_dir = Path(os.path.abspath(script_name)).resolve().parent
 
 #=====================================================================================================
 # Path specifications
 
-dataFile = Path("../data/MSTDB-TC_V3.0_Chlorides_No_Functions_8-2.dat")
-scriptName = "../runThermochimica.ti"
+dataFile = script_dir / "../data/MSTDB-TC_V3.0_Chlorides_No_Functions_8-2.dat"
+scriptName = script_dir / "../runThermochimica.ti"
 
-thermochimicaPath = Path("/home/mlouis9/thermochimica")
-outputPath = Path("../../PythonProjects/fuelOptimization/corrosionCalcs/outputs")
+thermochimicaPath = script_dir / "/home/mlouis9/thermochimica"
+outputPath = script_dir / "outputs"
 
 #=====================================================================================================
 # Composition parameters
@@ -101,13 +107,11 @@ for zr_fraction in zr_fractions:
     # Run an input script
     outputName = f"corrZr{zr_fraction:1.0f}.json"
 
-    # thermoTools.RunInputScript(scriptName, jsonName=str(outputPath / outputName), thermochimica_path=str(thermochimicaPath),\
-                                # noOutput=True)
-
-
+    thermoTools.RunInputScript(scriptName, jsonName=str(outputPath / outputName), thermochimica_path=str(thermochimicaPath),\
+                                noOutput=True)
 
     # Now read the output using tta and plot
-    calc = tta.thermoOut(f'outputs/{outputName}')
+    calc = tta.thermoOut(str(script_dir / f'outputs/{outputName}'))
 
     # Make sure that no surrogate elements are also present in the fuel (otherwise we have to add some new capabilities)
     for element in stainless_steel_316.keys():
@@ -167,7 +171,7 @@ plt.ylabel('Total corrosion depth ($\mu$m)')
 plt.xlabel('Temperature (K)')
 plt.grid()
 plt.legend()
-plt.savefig("plots/effectOfZr.png", dpi=500)
+plt.savefig(str(script_dir / "plots/effectOfZr.png"), dpi=500)
 plt.clf()
             
 # Plot corrosion composition
@@ -179,7 +183,7 @@ for label, corroded_elements in corroded_element_moles.items():
     plt.xlabel('Temperature (K)')
     plt.grid()
     plt.legend()
-    plt.savefig(f"plots/corrodedElements{label}.png", dpi=500)
+    plt.savefig(str(script_dir / f"plots/corrodedElements{label}.png"), dpi=500)
     plt.clf()
 
 # Now plot mol CrCl2/mol fuel
@@ -191,5 +195,5 @@ plt.ylabel('moles of Cr corroded / mole of fuel salt')
 plt.xlabel('Temperature (K)')
 plt.grid()
 plt.legend()
-plt.savefig('plots/chromiumVsZr.png', dpi=500)
+plt.savefig(str(script_dir / 'plots/chromiumVsZr.png'), dpi=500)
 plt.clf()
