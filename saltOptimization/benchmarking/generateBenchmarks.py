@@ -4,11 +4,17 @@ import json
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
+import os
+import sys
 
-script_dir = Path(__file__).resolve().parent
+# Get the script name from sys.argv
+script_name = sys.argv[0]
+
+# Get the absolute path of the script
+script_dir = Path(os.path.abspath(script_name)).resolve().parent
 
 # File IO input parameters
-thermochimica_path = Path("/home/mlouis9/thermochimica")
+thermochimica_path = script_dir / "../../thermochimica"
 output_path = ( script_dir / '..' / 'outputs' ).resolve()
 output_name = 'output.json'
 data_file = ( script_dir / "../data/MSTDB-TC_V3.0_Chlorides_No_Functions_8-2.dat" ).resolve()
