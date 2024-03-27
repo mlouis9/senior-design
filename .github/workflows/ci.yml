@@ -16,7 +16,10 @@ jobs:
         ssh-private-key: ${{ secrets.PERSONAL_SSH_PRIVATE_KEY }}
 
     - name: Clone forked public thermochimica repository
-      run: git clone git@github.com:mlouis9/thermochimica.git ~/thermochimica
+      run: |
+        git clone git@github.com:mlouis9/thermochimica.git ~/thermochimica
+        cd ~/thermochimica
+        git checkout extra-options
 
     - name: Add code.ornl.gov to SSH known_hosts
       run: ssh-keyscan code.ornl.gov >> ~/.ssh/known_hosts
