@@ -1,15 +1,17 @@
 import thermoTools
-import modules.thermoToolsAdditions as tta
+import thermoToolsAdditions as tta
 import json
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+script_dir = Path(__file__).resolve().parent
+
 # File IO input parameters
 thermochimica_path = Path("/home/mlouis9/thermochimica")
-output_path = Path("../../PythonProjects/fuelOptimization/outputs")
+output_path = ( script_dir / '..' / 'outputs' ).resolve()
 output_name = 'output.json'
-data_file = Path("../data/MSTDB-TC_V3.0_Chlorides_No_Functions_8-2.dat")
+data_file = ( script_dir / "../data/MSTDB-TC_V3.0_Chlorides_No_Functions_8-2.dat" ).resolve()
 input_file_name = "runThermochimica.ti"
 
 
@@ -46,15 +48,15 @@ for case_index, case in enumerate(cases):
     # Now load output.json and plot
 
     # Plot region diagram
-    loaded_output = tta.thermoOut(Path('../outputs/output.json'))
-    diagram = tta.pseudoBinaryDiagram(left_endmember_composition, right_endmember_composition, Path('../outputs/output.json'), \
+    loaded_output = tta.thermoOut(output_path / output_name)
+    diagram = tta.pseudoBinaryDiagram(left_endmember_composition, right_endmember_composition, output_path / output_name, \
                                     plot_everything=case_index == 3, ntstep=ntstep, nxstep=nxstep)
     diagram.plot_phase_regions(plot_marker='.', plot_mode='region')
-    diagram.plot.fig.savefig(f"plots/{case_names[case_index]}Region", bbox_inches='tight')
+    diagram.plot.fig.savefig(str(script_dir / f"plots/{case_names[case_index]}Region"), bbox_inches='tight')
 
     # Plot boundary diagram
     diagram.plot_phase_regions(plot_marker='.-', plot_mode='boundary')
-    diagram.plot.fig.savefig(f"plots/{case_names[case_index]}Boundary", bbox_inches='tight')
+    diagram.plot.fig.savefig(str(script_dir / f"plots/{case_names[case_index]}Boundary"), bbox_inches='tight')
 
     # If solubility calc, calculate solubility as a function of temperature and plot
     if case_index == 3:
@@ -73,4 +75,4 @@ for case_index, case in enumerate(cases):
         plt.xlabel('T (K)')
         plt.ylabel('$S_{\\text{PuCl}_3}\\text{ (mole fraction PuCl}_3\\text{)}$')
         plt.legend()
-        plt.savefig('plots/solubilityComparison')
+        plt.savefig(str(script_dir / 'plots/solubilityComparison'))
