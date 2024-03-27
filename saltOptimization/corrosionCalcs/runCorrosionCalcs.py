@@ -19,7 +19,7 @@ script_dir = Path(os.path.abspath(script_name)).resolve().parent
 dataFile = script_dir / "../../thermochimica/data/MSTDB-TC_V3.0_Chlorides_No_Functions_8-2.dat"
 scriptName = script_dir / "../runThermochimica.ti"
 
-thermochimicaPath = script_dir / "/home/mlouis9/thermochimica"
+thermochimicaPath = script_dir / "../../thermochimica"
 outputPath = script_dir / "outputs"
 
 #=====================================================================================================

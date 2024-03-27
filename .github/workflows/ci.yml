@@ -18,16 +18,6 @@ jobs:
     - name: Clone forked public thermochimica repository
       run: git clone git@github.com:mlouis9/thermochimica.git ~/thermochimica
 
-    - name: Install system dependencies for Thermochimica
-      run: |
-        sudo apt update
-        sudo apt install -y build-essential gfortran liblapack-dev
-
-    - name: Build Thermochimica
-      run: |
-        cd ~/thermochimica
-        make
-
     - name: Add code.ornl.gov to SSH known_hosts
       run: ssh-keyscan code.ornl.gov >> ~/.ssh/known_hosts
 
@@ -52,6 +42,16 @@ jobs:
 
     - name: Add thermochimica/python directory and modules to PYTHONPATH
       run: echo "PYTHONPATH=$PYTHONPATH:$HOME/thermochimica/python:${GITHUB_WORKSPACE}/modules" >> $GITHUB_ENV
+
+    - name: Install system dependencies for Thermochimica
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential gfortran liblapack-dev
+
+    - name: Build Thermochimica
+      run: |
+        cd ~/thermochimica
+        make
 
     - name: Run pytest
       run: |
