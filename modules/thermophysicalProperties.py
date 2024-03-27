@@ -656,8 +656,6 @@ class Database:
         for key_dict in keys_with_correct_endmembers:
             key_compositions = np.array([key_dict[key] for key in input_composition_keys])
             thermophysical_property_exists_in_db = self.data[key_dict][thermophysical_property] is not None
-            print(key_dict)
-            print(key_compositions, input_compositions)
             if np.all(np.isclose(key_compositions, input_compositions, atol=Database.COMPOSITION_TOLERANCE)) and thermophysical_property_exists_in_db:
                 return self.data[key_dict][thermophysical_property]
 
