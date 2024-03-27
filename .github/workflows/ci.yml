@@ -40,8 +40,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Add thermochimica/python directory to PYTHONPATH
-      run: echo "PYTHONPATH=$PYTHONPATH:$HOME/thermochimica/python" >> $GITHUB_ENV
+    - name: Add thermochimica/python directory and modules to PYTHONPATH
+      run: |
+        echo "PYTHONPATH=$PYTHONPATH:$HOME/thermochimica/python" >> $GITHUB_ENV
+        echo "PYTHONPATH=$PYTHONPATH:${GITHUB_WORKSPACE}/modules" >> $GITHUB_ENV
 
     - name: List directory contents
       run: ls -alh "$HOME/thermochimica/python"
