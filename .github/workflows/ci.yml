@@ -30,6 +30,9 @@ jobs:
     - name: Copy chem sage .dat files from MSTDB to  thermochimica data directory
       run: cp ~/mstdb/Models\ and\ Documentation/*.dat ~/thermochimica/data
 
+    - name: Create Symlinks
+      run: ./create_symlink.sh
+
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
