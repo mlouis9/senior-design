@@ -1,7 +1,6 @@
 # contents of test_script1.py
 
 import pytest
-from scripts import script1
 
 def test_script1_runs():
     # Assuming your script has a main function that runs the main script logic
