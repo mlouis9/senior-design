@@ -1,0 +1,46 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout main repository
+      uses: actions/checkout@v2
+
+    - name: Setup SSH for private repository access
+      uses: webfactory/ssh-agent@v0.5.3
+      with:
+        ssh-private-key: ${{ secrets.PERSONAL_SSH_PRIVATE_KEY }}
+
+    - name: Clone forked public thermochimica repository
+      run: git clone git@github.com:mlouis9/thermochimica.git ~/thermochimica
+
+    - name: Add code.ornl.gov to SSH known_hosts
+      run: ssh-keyscan code.ornl.gov >> ~/.ssh/known_hosts
+
+    - name: Clone MSTDB-TP restricted private repository
+      run: git clone git@code.ornl.gov:neams/mstdb-tp.git ~/mstdb-tp
+
+    - name: Clone MSTDB restricted private repository
+      run: git clone git@code.ornl.gov:neams/mstdb.git ~/mstdb
+
+    - name: Copy chem sage .dat files from MSTDB to  thermochimica data directory
+      run: cp ~/mstdb/Models\ and\ Documentation/*.dat ~/thermochimica/data
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest
+        # If you have a requirements.txt file:
+        pip install -r requirements.txt
+
+    - name: Run pytest
+      run: pytest
