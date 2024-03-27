@@ -17,7 +17,7 @@ script_dir = Path(os.path.abspath(script_name)).resolve().parent
 thermochimica_path = script_dir / "../../thermochimica"
 output_path = ( script_dir / '..' / 'outputs' ).resolve()
 output_name = 'output.json'
-data_file = ( script_dir / "../data/MSTDB-TC_V3.0_Chlorides_No_Functions_8-2.dat" ).resolve()
+data_file = ( script_dir / "../../thermochimica/data/MSTDB-TC_V3.0_Chlorides_No_Functions_8-2.dat" ).resolve()
 input_file_name = "runThermochimica.ti"
 
 
@@ -29,10 +29,10 @@ munit = 'moles'
 
 xlo = 0.0
 xhi = 1.0
-nxstep = 120
+nxstep = 20
 tlo = 500
 thi = 1200
-ntstep = 120
+ntstep = 20
 
 # Define cases, i.e. all of the pseudo binary systems shown in Zhang
 cases = [(['K', 'Cl', 'Pu'], {'K Cl': 1.0}, {'Pu Cl_3': 1.0}), \
