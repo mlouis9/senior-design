@@ -3,8 +3,12 @@ This repository contains all of the code necessary for reproducing the calculati
 
 ## Table of Contents
 
-- [Fuel/coolant salt optimization](./saltOptimization/README.md)
-- [Core height scoping calculation](./coreHeightScoping/README.md)
+- [coreHeightScoping](coreHeightScoping/README.md)
+- [saltOptimization](saltOptimization/README.md)
+  - [benchmarking](saltOptimization/benchmarking/README.md)
+  - [corrosionCalcs](saltOptimization/corrosionCalcs/README.md)
+  - [thermophysicalProperties](saltOptimization/thermophysicalProperties/README.md)
+    - [benchmarking](saltOptimization/thermophysicalProperties/benchmarking/README.md)
 
 ## Requirements
 
