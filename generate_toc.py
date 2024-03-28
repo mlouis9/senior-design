@@ -1,21 +1,39 @@
 import os
+import re
 
 # -------------------------------------------------------------------------------
 # This is a script for automatically updating the table of contents of the main
-# README file in the this repository, please don't update this unless changing
+# README file in this repository, please don't update this unless changing
 # the TOC is your intention.
 # -------------------------------------------------------------------------------
 
-def generate_toc(directory, level=0):
+def load_gitignore_patterns(gitignore_path='.gitignore'):
+    patterns = []
+    with open(gitignore_path, 'r') as file:
+        for line in file:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                # Convert the .gitignore pattern to a regular expression
+                pattern = re.escape(line).replace(r'\*', '.*').replace(r'\?', '.')
+                patterns.append(re.compile(pattern))
+    return patterns
+
+def is_ignored(path, ignore_patterns):
+    for pattern in ignore_patterns:
+        if pattern.fullmatch(path):
+            return True
+    return False
+
+def generate_toc(directory, ignore_patterns, level=0):
     toc = ""
-    for item in os.listdir(directory):
+    for item in sorted(os.listdir(directory)):
         item_path = os.path.join(directory, item)
-        if os.path.isdir(item_path):
+        if os.path.isdir(item_path) and not is_ignored(item, ignore_patterns):
             readme_path = os.path.join(item_path, "README.md")
             if os.path.isfile(readme_path):
                 indent = "  " * level
                 toc += f"{indent}- [{item}]({os.path.relpath(readme_path, '.')})\n"
-                toc += generate_toc(item_path, level + 1)
+                toc += generate_toc(item_path, ignore_patterns, level + 1)
     return toc
 
 def update_toc_in_readme(readme_path, new_toc):
@@ -38,11 +56,14 @@ def update_toc_in_readme(readme_path, new_toc):
     else:
         print("Error: Table of Contents section not found in the README file.")
 
+# Load .gitignore patterns
+gitignore_patterns = load_gitignore_patterns()
+
 # Specify the path to your main README file
 readme_path = "README.md"
 
 # Generate the Table of Contents
-toc = generate_toc(".")
+toc = generate_toc(".", gitignore_patterns)
 
 # Update the Table of Contents in the README file if there are changes
 update_toc_in_readme(readme_path, toc)

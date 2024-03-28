@@ -119,3 +119,6 @@ Thumbs.db
 *.sublime-workspace
 .env.local
 .env.*.local
+
+# Pytest
+*pytest*
