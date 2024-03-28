@@ -1,5 +1,11 @@
-import os
+import os, sys
 import re
+
+# Get the script name from sys.argv
+script_name = sys.argv[0]
+
+# Get the absolute path of the script
+script_dir = Path(os.path.abspath(script_name)).resolve().parent
 
 # -------------------------------------------------------------------------------
 # This is a script for automatically updating the table of contents of the main
@@ -7,7 +13,7 @@ import re
 # the TOC is your intention.
 # -------------------------------------------------------------------------------
 
-def load_gitignore_patterns(gitignore_path='.gitignore'):
+def load_gitignore_patterns(gitignore_path=str(script_dir / '.gitignore')):
     patterns = []
     with open(gitignore_path, 'r') as file:
         for line in file:
