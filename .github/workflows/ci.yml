@@ -57,7 +57,7 @@ jobs:
     - name: Build Thermochimica
       run: |
         cd ~/thermochimica
-        make
+        make test
 
     - name: Verify Correct Data Directory
       run: |
