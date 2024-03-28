@@ -59,11 +59,6 @@ jobs:
         cd ~/thermochimica
         make test
 
-    - name: Verify Correct Data Directory
-      run: |
-        cd ~/thermochimica/data
-        ls
-
     - name: Run pytest
       run: |
         echo $PYTHONPATH

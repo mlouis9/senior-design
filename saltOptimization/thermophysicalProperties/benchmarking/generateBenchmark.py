@@ -18,8 +18,6 @@ script_dir = Path(os.path.abspath(script_name)).resolve().parent
 mstdb_tp_path = script_dir / '../../../mstdb-tp/Molten_Salt_Thermophysical_Properties.csv'
 mstdb_tp_rk_path = script_dir / '../../../mstdb-tp/Molten_Salt_Thermophysical_Properties_RK.csv'
 
-print(str( script_dir / 'plots' / 'KClNaClCalculated.png' ))
-
 db = Database(mstdb_tp_path, mstdb_tp_rk_path)
 
 # ----------------------
