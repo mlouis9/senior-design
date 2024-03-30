@@ -632,7 +632,7 @@ class Database:
         database_endmembers = set(key for frozen_dict_key in self.data.keys() for key in frozen_dict_key.keys())
         endmembers_data_dict = {endmember: False for endmember in composition_dict.keys()}
         for endmember in composition_dict.keys():
-            assert endmember in database_endmembers, (f"The endmember {endmember} is not contiained in the given database"
+            assert endmember in database_endmembers, (f"The endmember {endmember} is not contiained in the given database "
                                                        "either update the database path or provide a different salt")
             
             if self.data[frozendict({endmember: 1.0})][thermophysical_property] is not None:
