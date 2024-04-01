@@ -16,6 +16,9 @@ from io import StringIO
 import sys
 from thermo.mixture import Mixture
 
+# Set to raise errors instead of warnings on division by zero
+np.seterr(divide='raise')
+
 """This is a module containing all of the supporting classes and functions for running the calculations needed for my Senior Deisgn
 project. This module extends the built-in thermochimica modules 'thermoTools' and 'pseudoBinaryPhaseDiagramFunctions', and contains 
 a function for automatically executing a solubility calculation, and easily reading output.
@@ -692,12 +695,14 @@ def element_to_component_fractions_pseudo_binary(left_endmember_composition, rig
         for index, element in enumerate(unique_elements):
             # Iterate over all possible elements, unless the two endmembers are exactly the same, there will be one for which the denominator is
             # nonzero, hence allowing us to calculate the right endmember fraction
-            
-            frac_right_endmember = (element_composition[unique_elements[0]] - left_endmember_element_composition[0]) / \
-                                (right_endmember_element_composition[0] - left_endmember_element_composition[0])
-            if not np.isnan(frac_right_endmember): 
-                break
-            
+
+            try:
+                frac_right_endmember = (element_composition[unique_elements[index]] - left_endmember_element_composition[index]) / \
+                                (right_endmember_element_composition[index] - left_endmember_element_composition[index])
+                break # no divide by zero encountered
+            except FloatingPointError:
+                # Division by zero error! Try another element
+                continue
         
 
     # Now, make sure that endmembers were properly specified. If not, the mole fraction computed above may not result in the correct element_composition
@@ -965,7 +970,7 @@ def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, outpu
     return calc
 
 def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, data_file, salt_composition: dict, elements_used: list, tlo: float=0, \
-                                  thi: float=2500, ntstep: float=100, x_delta: float=0.1, nxstep: float=50, pressure: float=1, liquid_phase: frozenset=None, \
+                                  thi: float=2500, ntstep: float=100, x_delta: float=0.1, nxstep: float=20, pressure: float=1, liquid_phase: frozenset=None, \
                                     gas_phase: frozenset=frozenset({'gas_ideal'})):
     """Utility for calculating the melting and boiling points of a salt of a given composition at a given pressure"""
 
