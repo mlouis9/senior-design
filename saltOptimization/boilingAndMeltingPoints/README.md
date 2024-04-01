@@ -1,0 +1,4 @@
+# Benchmark Case
+For the purposes of benchmarking the calculation of melting and boiling points (of molten salts), a single test case, namely the salt LiF-NaF-KF (0.465-0.115-0.42 mol%) for which the melting and boiling points are (as listed in MSTDB-TP 3.0) $T_m = 735$ K, $T_b = 1843$ K (it's assumed these values are at atmospheric pressure). This benchmark just consists of comapring the calculated melting and boiling points to  those found in the database.
+
+It's worth noting that the exact boiling and melting temperatures depend on the definition in `calculate_melting_and_boiling`, by default, `liquid_phase` is just 'MSCL' or 'MSFL', and `gas_phase` is 'gas_ideal', although it may be preferable to define any phase where 'gas_ideal' is present to be a gas phase.
