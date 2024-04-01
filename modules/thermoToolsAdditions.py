@@ -15,6 +15,7 @@ from sklearn.cluster import DBSCAN
 from io import StringIO
 import sys
 from thermo.mixture import Mixture
+import re
 
 # Set to raise errors instead of warnings on division by zero
 np.seterr(divide='raise')
@@ -225,6 +226,8 @@ class pseudoBinaryDiagram(thermoOut):
         self.right_endmember = right_endmember_composition
 
         # Get mass labels for plotting
+        print(left_endmember_composition)
+        print(right_endmember_composition, self.elements)
         left_endmember_masses = component_fractions_to_element_fractions(left_endmember_composition, self.elements)
         right_endmember_masses = component_fractions_to_element_fractions(right_endmember_composition, self.elements)
         self.mass_labels = get_mass_labels(left_endmember_masses, right_endmember_masses, self.elements)
@@ -707,6 +710,7 @@ def element_to_component_fractions_pseudo_binary(left_endmember_composition, rig
                 # Division by zero error! Try another element
                 continue
         
+    print(f'RIGHT ENDMEMBER FRAC {frac_right_endmember}')
 
     # Now, make sure that endmembers were properly specified. If not, the mole fraction computed above may not result in the correct element_composition
     calculated_element_composition = { element: 0.0 for element in unique_elements }
@@ -747,7 +751,7 @@ def element_to_component_fractions_pseudo_binary(left_endmember_composition, rig
         (
             f"The two dicts {calculated_element_composition} and {element_composition} are not within floating point error. "
             f"Inconsistent endmembers {left_endmember_composition} and {right_endmember_composition} specified for the given "
-            "element_composition {element_composition}! No solution can be found."
+            f"element_composition {element_composition}! No solution can be found."
         )
 
     return frac_right_endmember
@@ -972,9 +976,10 @@ def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, outpu
 
     return calc
 
-def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, data_file, salt_composition: dict, elements_used: list, plot_diagram=False, tlo: float=0, \
-                                  thi: float=2500, ntstep: float=100, x_delta: float=0.1, nxstep: float=20, pressure: float=1, liquid_phase: frozenset=None, \
-                                    gas_phase: frozenset=frozenset({'gas_ideal'})):
+def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, data_file, salt_composition: dict, \
+                                  elements_used: list, method: str='single composition', plot_diagram=False, tlo: float=0, \
+                                  thi: float=2500, ntstep: int=100, x_delta: float=0.1,  nxstep: int=20, pressure: float=1, \
+                                  liquid_phase: frozenset=None, gas_phase: frozenset=frozenset({'gas_ideal'})):
     """Utility for calculating the melting and boiling points of a salt of a given composition at a given pressure
     
     Parameters:
@@ -985,6 +990,9 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
         data_file:
         salt_composition:
         elements_used:
+        method: The method used to calculate the melting and boiling points. Can be either 'single composition' (preferred for 
+                quick calculations), or 'pseudo binary' which uses a pseudo binary diagram around the composition of interest to
+                determine the phase boundary (much slower)
         plot_diagram: If the intermediate phase diagram (used for calculating the melting and boiling points) should be plotted. This can be helpful for
                       determining the phases that occur near the melting and boiling points for more precise calculations.
     
@@ -1005,51 +1013,110 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
             liquid_phase = frozenset({'MSFL'})
         else:
             raise ValueError("The datafile you provided does not seem to refer to either the fluoride or chloride molten salt database. " 
-                             "Melting and boiling point calculations are currently only supported for Molten Salts.") # Not really a "value error" but gives correct functionality
+                            "Melting and boiling point calculations are currently only supported for Molten Salts.") # Not really a "value error" but gives correct functionality
 
-    # Now create another endmember by changing the fraction of the first component by x_delta
-    new_endmember_composition = copy.deepcopy(salt_composition)
-    new_endmember_composition[list(new_endmember_composition.keys())[0]] += x_delta
 
-    left_boundary = 0.001 # This is used for calculating melting point and is not zero to avoid vertical lines
-    xlo = 0.0
-    xhi = 1.0
+    if method == 'phase diagram':
+        
+        # Now create another endmember by changing the fraction of the first component by x_delta
+        new_endmember_composition = copy.deepcopy(salt_composition)
+        new_endmember_composition[list(new_endmember_composition.keys())[0]] += x_delta
 
-    left_endmember_composition = salt_composition
-    right_endmember_composition = new_endmember_composition
+        left_boundary = 0.001 # This is used for calculating melting point and is not zero to avoid vertical lines
+        xlo = 0.0
+        xhi = 1.0
 
-    calc = pseudo_binary_calculation(thermochimica_path, output_path, output_name, data_file, xlo, xhi, nxstep, tlo, thi, ntstep, elements_used,\
-                                left_endmember_composition, right_endmember_composition)
-    diagram = pseudoBinaryDiagram(left_endmember_composition, right_endmember_composition, output_path / output_name, \
-                                    plot_everything=1, ntstep=ntstep, nxstep=nxstep)
-    
-    if plot_diagram:
-        diagram.plot_phase_regions(plot_marker='.', plot_mode='region')
-        plt.show()
+        left_endmember_composition = salt_composition
+        right_endmember_composition = new_endmember_composition
 
-    liquid_phase_region = diagram.regions[liquid_phase]
+        calc = pseudo_binary_calculation(thermochimica_path, output_path, output_name, data_file, xlo, xhi, nxstep, tlo, thi, ntstep, elements_used,\
+                                    left_endmember_composition, right_endmember_composition)
+        diagram = pseudoBinaryDiagram(left_endmember_composition, right_endmember_composition, output_path / output_name, \
+                                        plot_everything=1, ntstep=ntstep, nxstep=nxstep)
+        
+        if plot_diagram:
+            diagram.plot_phase_regions(plot_marker='.', plot_mode='region')
+            plt.show()
 
-    try:
-        liquid_hull = ConvexHull(liquid_phase_region)
-    except:
-        assert("Either liquid phase region is not present, or has not been properly resolved, please run again with more composition steps.")
+        liquid_phase_region = diagram.regions[liquid_phase]
 
-    # ------------------------------------------------------------------
-    # Now calculate intersections with the vertical line x=left_boundary
-    # ------------------------------------------------------------------
+        try:
+            liquid_hull = ConvexHull(liquid_phase_region)
+        except:
+            assert("Either liquid phase region is not present, or has not been properly resolved, please run again with more composition steps.")
 
-    x_val = left_boundary
-    intersections = []
-    for simplex in liquid_hull.simplices:
-        start, end = liquid_phase_region[simplex, :]
-        if min(start[0], end[0]) <= x_val <= max(start[0], end[0]):
-            # Solve the line equation for y to find the intersection point
-            slope = (end[1] - start[1]) / (end[0] - start[0])
-            y_intersect = slope * (x_val - start[0]) + start[1]
-            intersections.append(y_intersect)
+        # ------------------------------------------------------------------
+        # Now calculate intersections with the vertical line x=left_boundary
+        # ------------------------------------------------------------------
 
-    # Now find the melting and boiling points
-    melting_point = np.min(intersections)
-    boiling_point = np.max(intersections)
+        x_val = left_boundary
+        intersections = []
+        for simplex in liquid_hull.simplices:
+            start, end = liquid_phase_region[simplex, :]
+            if min(start[0], end[0]) <= x_val <= max(start[0], end[0]):
+                # Solve the line equation for y to find the intersection point
+                slope = (end[1] - start[1]) / (end[0] - start[0])
+                y_intersect = slope * (x_val - start[0]) + start[1]
+                intersections.append(y_intersect)
+
+        # Now find the melting and boiling points
+        melting_point = np.min(intersections)
+        boiling_point = np.max(intersections)
+
+    elif method == 'single composition':        
+        liquid_phase = list(liquid_phase)[0]
+        gas_phase = list(gas_phase)[0]
+
+        # First get element fractions of input composition
+        element_fractions = component_fractions_to_element_fractions(salt_composition, elements_used)
+        temps = np.linspace(tlo,thi,ntstep)
+
+        # Write the calculation list
+        calcList = []
+        for t in temps:
+            calc = [t, pressure]
+            calc.extend(element_fractions)
+            calcList.append(calc)
+        thermoTools.WriteRunCalculationList('runThermochimica.ti',data_file,elements_used,calcList,tunit='K',punit='atm',munit='moles',printMode=0,fuzzyStoichiometry=True,gibbsMinCheck=False)
+        print('Thermochimica calculation initiated.')
+        thermoTools.RunRunCalculationList('runThermochimica.ti', jsonName=str(output_path / output_name), thermochimica_path=str(thermochimica_path))
+        print('Thermochimica calculation finished.')
+
+        # Now read output and find the first occurrence of the liquid and gas phases
+        calc = thermoOut(output_path / output_name)
+
+        # For each state search for the liquid and gas phases until they are found. Say that each
+        # phase starts when the same phase is present in two adjacent steps
+        searching_for_liquid = True
+        searching_for_gas = True
+        found_liquid_in_last_state = False
+        found_gas_in_last_state = False
+        states = list(calc.stable_solution_phases.keys())
+        index = 0
+        while searching_for_liquid or searching_for_gas:
+            state = states[index]
+            for phase_tuple in calc.stable_solution_phases[state]:
+                if (phase_tuple[0] == liquid_phase) and searching_for_liquid:
+                    if found_liquid_in_last_state:
+                        searching_for_liquid = False
+                    else:
+                        melting_point = calc.temperatures[state]
+                        found_liquid_in_last_state = True
+                if (phase_tuple[0] == gas_phase) and searching_for_gas:
+                    if found_gas_in_last_state:
+                        searching_for_gas = False
+                    else:
+                        boiling_point = calc.temperatures[state]
+                        found_gas_in_last_state = True
+            index += 1
+
 
     return melting_point, boiling_point
+
+def convert_to_thermochem_name(species_string):
+    """Tool for converting from species names of the form """
+    # Add an underscore before all numbers
+    species_string = re.sub(r'(?<!^)(?=\d)', '_', species_string)
+    # Insert space before capital letters not at the beginning, preceded by a letter or number
+    species_string = re.sub(r'(?<=[a-zA-Z0-9])(?=[A-Z])', ' ', species_string)
+    return species_string
