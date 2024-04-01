@@ -662,19 +662,43 @@ def element_to_component_fractions_pseudo_binary(left_endmember_composition, rig
     left_endmember_element_composition = component_fractions_to_element_fractions(left_endmember_composition, unique_elements)
     right_endmember_element_composition = component_fractions_to_element_fractions(right_endmember_composition, unique_elements)
 
-    # Now, find the element(s) in the right endmember that are not present in the left-endmember
+    # Now, find the element(s) in the right endmember that are not present in the left-endmember (if any)
     for index, _ in enumerate(unique_elements):
         if (left_endmember_element_composition[index] == 0) and (right_endmember_element_composition[index] != 0):
             unique_endmember_index = index
             unique_endmember_element = unique_elements[index]
             break
+    
+    try:
+        # Now can easily calculate mole fraction of the right endmember via
+        if unique_endmember_element in element_composition:
+            frac_right_endmember = element_composition[unique_endmember_element]/right_endmember_element_composition[unique_endmember_index]
+        else:
+            frac_right_endmember = 0 # Thermochimica doesn't print elements with zero mole fractions in output.json
 
-    # Now can easily calculate mole fraction of the right endmember via
-    if unique_endmember_element in element_composition:
-        frac_right_endmember = element_composition[unique_endmember_element]/right_endmember_element_composition[unique_endmember_index]
-    else:
-        frac_right_endmember = 0 # Thermochimica doesn't print elements with zero mole fractions in output.json
+    except UnboundLocalError: # unique_endmember_element is not assigned, there are no elements in the right endmember that are not also in the left \
+                              # (but they may have different compositions)
+        """This case involves solving a proper linear system to find the fraction of the right endmember
+        
+        Note, for an arbitrary element A, the mole fraction of A in any composition (generated from a pseudo binary interpolation) can be calculated
+        via
 
+            \\x_A = (1-x)*x_{L, A} + x*x_{R, A}
+            \implies x = (x_A - x_{L, A})/(x_{R, A} - x_{L, A})
+        where x generically denotes the mole fraction of the right endmember (from zero to 1), and x_{L, A} and x_{R, A} respectively denote the mole
+        fraction of A in the left and right endmembers.
+        """
+
+        for index, element in enumerate(unique_elements):
+            # Iterate over all possible elements, unless the two endmembers are exactly the same, there will be one for which the denominator is
+            # nonzero, hence allowing us to calculate the right endmember fraction
+            
+            frac_right_endmember = (element_composition[unique_elements[0]] - left_endmember_element_composition[0]) / \
+                                (right_endmember_element_composition[0] - left_endmember_element_composition[0])
+            if not np.isnan(frac_right_endmember): 
+                break
+            
+        
 
     # Now, make sure that endmembers were properly specified. If not, the mole fraction computed above may not result in the correct element_composition
     calculated_element_composition = { element: 0.0 for element in unique_elements }
@@ -692,7 +716,7 @@ def element_to_component_fractions_pseudo_binary(left_endmember_composition, rig
         if element in right_endmember_elements:
             calculated_element_composition[element] += frac_right_endmember*right_endmember_element_composition[index]
     
-    # Now get rid of zero values (which won't be present in teh original 'element_composition')
+    # Now get rid of zero values (which won't be present in the original 'element_composition')
     calculated_element_composition = {key: value for key, value in calculated_element_composition.items() if value != 0}
 
     def are_dicts_almost_equal(a, b, tolerance=1e-9):
@@ -710,7 +734,13 @@ def element_to_component_fractions_pseudo_binary(left_endmember_composition, rig
     # Now convert to element fractions to compare with the original 'element_composition'
     # Note, there will be some roundoff error when computing the "calculated_element_composition" dict, so we assert that these dictionaries must
     # be within some absolute tolerance (by default taken to be 1e-9) of each other
-    assert are_dicts_almost_equal(calculated_element_composition, element_composition), f"Inconsistent endmembers {left_endmember_composition} and {right_endmember_composition} specified for the given element_composition {element_composition}! No solution can be found."
+
+    assert are_dicts_almost_equal(calculated_element_composition, element_composition), \
+        (
+            f"The two dicts {calculated_element_composition} and {element_composition} are not within floating point error. "
+            f"Inconsistent endmembers {left_endmember_composition} and {right_endmember_composition} specified for the given "
+            "element_composition {element_composition}! No solution can be found."
+        )
 
     return frac_right_endmember
 
@@ -933,3 +963,40 @@ def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, outpu
     os.remove(input_file_name)
 
     return calc
+
+def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, data_file, salt_composition: dict, elements_used: list, tlo: float=0, \
+                                  thi: float=2500, ntstep: float=100, x_delta: float=0.1, nxstep: float=50, pressure: float=1, liquid_phase: frozenset=None, \
+                                    gas_phase: frozenset=frozenset({'gas_ideal'})):
+    """Utility for calculating the melting and boiling points of a salt of a given composition at a given pressure"""
+
+    # This calculation works by computing the phase boundaries from a phase diagram (for which a tool already exists) rather than checking some phase
+    # tolerance to determine when the liquid and gas phases first form
+    
+    if liquid_phase == None:
+        # The default liquid phase depends on the datafile used (i.e. chloride or fluoride), so
+        # this should be updated to be MSCL or MSFL accordingly
+        if 'Chloride' in data_file.name:
+            liquid_phase = frozenset({'MSCL'})
+        elif 'Fluoride' in data_file.name:
+            liquid_phase = frozenset({'MSFL'})
+        else:
+            raise ValueError("The datafile you provided does not seem to refer to either the fluoride or chloride molten salt database. " 
+                             "Melting and boiling point calculations are currently only supported for Molten Salts.") # Not really a "value error" but gives correct functionality
+
+    # Now create another endmember by changing the fraction of the first component by x_delta
+    new_endmember_composition = copy.deepcopy(salt_composition)
+    new_endmember_composition[list(new_endmember_composition.keys())[0]] += x_delta
+
+    xlo = 0.0
+    xhi = 1.0
+
+    left_endmember_composition = salt_composition
+    right_endmember_composition = new_endmember_composition
+
+    calc = pseudo_binary_calculation(thermochimica_path, output_path, output_name, data_file, xlo, xhi, nxstep, tlo, thi, ntstep, elements_used,\
+                                left_endmember_composition, right_endmember_composition)
+    diagram = pseudoBinaryDiagram(left_endmember_composition, right_endmember_composition, output_path / output_name, \
+                                    plot_everything=1, ntstep=ntstep, nxstep=nxstep)
+    diagram.plot_phase_regions(plot_marker='.', plot_mode='region')
+
+    return diagram
