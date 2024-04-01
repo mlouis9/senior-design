@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import math
 from scipy.spatial import ConvexHull
 import scipy
-from shapely import Polygon
+from shapely import Polygon, LineString, Point, MultiPoint
 import alphashape
 from sklearn.cluster import DBSCAN
 from io import StringIO
@@ -699,8 +699,11 @@ def element_to_component_fractions_pseudo_binary(left_endmember_composition, rig
             try:
                 frac_right_endmember = (element_composition[unique_elements[index]] - left_endmember_element_composition[index]) / \
                                 (right_endmember_element_composition[index] - left_endmember_element_composition[index])
-                break # no divide by zero encountered
-            except FloatingPointError:
+                if np.isnan((frac_right_endmember)):
+                    continue
+                else:
+                    break # no divide by zero encountered
+            except (ZeroDivisionError, FloatingPointError):
                 # Division by zero error! Try another element
                 continue
         
@@ -969,10 +972,26 @@ def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, outpu
 
     return calc
 
-def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, data_file, salt_composition: dict, elements_used: list, tlo: float=0, \
+def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, data_file, salt_composition: dict, elements_used: list, plot_diagram=False, tlo: float=0, \
                                   thi: float=2500, ntstep: float=100, x_delta: float=0.1, nxstep: float=20, pressure: float=1, liquid_phase: frozenset=None, \
                                     gas_phase: frozenset=frozenset({'gas_ideal'})):
-    """Utility for calculating the melting and boiling points of a salt of a given composition at a given pressure"""
+    """Utility for calculating the melting and boiling points of a salt of a given composition at a given pressure
+    
+    Parameters:
+    -----------
+        thermochimica_path: 
+        output_path:
+        output_name:
+        data_file:
+        salt_composition:
+        elements_used:
+        plot_diagram: If the intermediate phase diagram (used for calculating the melting and boiling points) should be plotted. This can be helpful for
+                      determining the phases that occur near the melting and boiling points for more precise calculations.
+    
+    Returns:
+    --------
+        A tuple: melting_point, boiling_point in kelvin.
+    """
 
     # This calculation works by computing the phase boundaries from a phase diagram (for which a tool already exists) rather than checking some phase
     # tolerance to determine when the liquid and gas phases first form
@@ -992,6 +1011,7 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
     new_endmember_composition = copy.deepcopy(salt_composition)
     new_endmember_composition[list(new_endmember_composition.keys())[0]] += x_delta
 
+    left_boundary = 0.001 # This is used for calculating melting point and is not zero to avoid vertical lines
     xlo = 0.0
     xhi = 1.0
 
@@ -1002,6 +1022,34 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
                                 left_endmember_composition, right_endmember_composition)
     diagram = pseudoBinaryDiagram(left_endmember_composition, right_endmember_composition, output_path / output_name, \
                                     plot_everything=1, ntstep=ntstep, nxstep=nxstep)
-    diagram.plot_phase_regions(plot_marker='.', plot_mode='region')
+    
+    if plot_diagram:
+        diagram.plot_phase_regions(plot_marker='.', plot_mode='region')
+        plt.show()
 
-    return diagram
+    liquid_phase_region = diagram.regions[liquid_phase]
+
+    try:
+        liquid_hull = ConvexHull(liquid_phase_region)
+    except:
+        assert("Either liquid phase region is not present, or has not been properly resolved, please run again with more composition steps.")
+
+    # ------------------------------------------------------------------
+    # Now calculate intersections with the vertical line x=left_boundary
+    # ------------------------------------------------------------------
+
+    x_val = left_boundary
+    intersections = []
+    for simplex in liquid_hull.simplices:
+        start, end = liquid_phase_region[simplex, :]
+        if min(start[0], end[0]) <= x_val <= max(start[0], end[0]):
+            # Solve the line equation for y to find the intersection point
+            slope = (end[1] - start[1]) / (end[0] - start[0])
+            y_intersect = slope * (x_val - start[0]) + start[1]
+            intersections.append(y_intersect)
+
+    # Now find the melting and boiling points
+    melting_point = np.min(intersections)
+    boiling_point = np.max(intersections)
+
+    return melting_point, boiling_point
