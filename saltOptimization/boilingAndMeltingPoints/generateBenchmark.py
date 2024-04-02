@@ -31,5 +31,4 @@ print(f"Phase diagram method {T_m}, {T_b}")
 
 # Try this using the faster calclist method
 T_m, T_b = tta.calculate_melting_and_boiling(thermochimica_path, output_path, output_name, data_file, salt_composition, elements_used)
-
 print(f"Fast method {T_m}, {T_b}")

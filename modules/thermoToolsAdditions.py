@@ -239,8 +239,6 @@ class pseudoBinaryDiagram(thermoOut):
         self.right_endmember = right_endmember_composition
 
         # Get mass labels for plotting
-        print(left_endmember_composition)
-        print(right_endmember_composition, self.elements)
         left_endmember_masses = component_fractions_to_element_fractions(left_endmember_composition, self.elements)
         right_endmember_masses = component_fractions_to_element_fractions(right_endmember_composition, self.elements)
         self.mass_labels = get_mass_labels(left_endmember_masses, right_endmember_masses, self.elements)
@@ -1018,7 +1016,7 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
     for index, path in enumerate(paths):
         if not path.is_absolute():
             paths[index] = path.resolve()
-            
+
     thermochimica_path, output_path, data_file = paths
 
     # This calculation works by computing the phase boundaries from a phase diagram (for which a tool already exists) rather than checking some phase
@@ -1080,8 +1078,12 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
                 intersections.append(y_intersect)
 
         # Now find the melting and boiling points
-        melting_point = np.min(intersections)
-        boiling_point = np.max(intersections)
+        try:
+            melting_point = np.min(intersections)
+            boiling_point = np.max(intersections)
+        except: # There are no intersections
+            raise ValueError("The liquid and/or gas phases were not present during the calculation, either the salt sublimates "
+                             "or the incorrect liquid and or gas phases were specified.")
 
     elif method == 'single composition':        
         liquid_phase = list(liquid_phase)[0]
@@ -1118,8 +1120,25 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
         found_gas_in_last_state = False
         states = list(calc.stable_solution_phases.keys())
         index = 0
+        log = [] # Used for printing the stable phase at each point
         while searching_for_liquid or searching_for_gas:
+            if index == len(states):
+                # First format logs for printing
+                if suppress_output:
+                    log = [] # Don't print logs
+                else:
+                    log = [ ' '.join(line) for line in log ]
+                    log = '\n'.join(log)
+                # One of the two was not assigned in the while loop, because the liquid_phase and/or gas_phase wasn't found
+                # Print the logs for debugging (maybe the incorrect phase names were supplied or the salt of interest sublimates)
+                raise ValueError("Either the specified liquid or gas phase was not present over the temperature range of the calculation. "
+                                f"The following phases were present throughout the calculation: \n{log}")
             state = states[index]
+
+            # Log stable solution phases (useful for debugging)
+            log.append( [ phase_tuple[0] for phase_tuple in calc.stable_solution_phases[state] ] )
+
+            # Now compute melting and boiling points
             for phase_tuple in calc.stable_solution_phases[state]:
                 if (phase_tuple[0] == liquid_phase) and searching_for_liquid:
                     if found_liquid_in_last_state:
@@ -1134,8 +1153,8 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
                         boiling_point = calc.temperatures[state]
                         found_gas_in_last_state = True
             index += 1
-
-
+            
+    # Regardless of the method, return the calculated  melting and boiling points
     return melting_point, boiling_point
 
 def convert_to_thermochem_name(species_string):
