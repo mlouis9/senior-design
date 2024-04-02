@@ -16,6 +16,19 @@ from io import StringIO
 import sys
 from thermo.mixture import Mixture
 import re
+import warnings
+
+# ---------------------
+# Customized Warnings
+# ---------------------
+
+# ANSI escape code for yellow
+YELLOW = '\033[93m'
+RESET = '\033[0m'
+
+# Customize warning format and add color
+warnings.formatwarning = lambda message, category, filename, lineno, line=None: \
+    f'{YELLOW}{filename}:{lineno}: {category.__name__}: {message}{RESET}\n'
 
 # Set to raise errors instead of warnings on division by zero
 np.seterr(divide='raise')
@@ -85,7 +98,7 @@ class thermoOut:
                 except:
                     # There is a problem with this state, i.e. it is either completely empty or missing required data, print
                     # the key for debugging purposes
-                    print(f"Warning: state {key} is missing data! Excluding this state from output")
+                    warnings.warn(f"Warning: state {key} is missing data! Excluding this state from output", UserWarning)
                     
                     # Now addd this to the list of bad keys
                     bad_keys.append(key)
@@ -709,8 +722,6 @@ def element_to_component_fractions_pseudo_binary(left_endmember_composition, rig
             except (ZeroDivisionError, FloatingPointError):
                 # Division by zero error! Try another element
                 continue
-        
-    print(f'RIGHT ENDMEMBER FRAC {frac_right_endmember}')
 
     # Now, make sure that endmembers were properly specified. If not, the mole fraction computed above may not result in the correct element_composition
     calculated_element_composition = { element: 0.0 for element in unique_elements }
@@ -977,9 +988,9 @@ def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, outpu
     return calc
 
 def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, data_file, salt_composition: dict, \
-                                  elements_used: list, method: str='single composition', plot_diagram=False, tlo: float=0, \
-                                  thi: float=2500, ntstep: int=100, x_delta: float=0.1,  nxstep: int=20, pressure: float=1, \
-                                  liquid_phase: frozenset=None, gas_phase: frozenset=frozenset({'gas_ideal'})):
+                                  elements_used: list, method: str='single composition', suppress_output=False, plot_diagram=False, \
+                                  tlo: float=0, thi: float=2500, ntstep: int=100, x_delta: float=0.1,  nxstep: int=20, \
+                                  pressure: float=1, liquid_phase: frozenset=None, gas_phase: frozenset=frozenset({'gas_ideal'})):
     """Utility for calculating the melting and boiling points of a salt of a given composition at a given pressure
     
     Parameters:
@@ -994,12 +1005,21 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
                 quick calculations), or 'pseudo binary' which uses a pseudo binary diagram around the composition of interest to
                 determine the phase boundary (much slower)
         plot_diagram: If the intermediate phase diagram (used for calculating the melting and boiling points) should be plotted. This can be helpful for
-                      determining the phases that occur near the melting and boiling points for more precise calculations.
+                      determining the phases that occur near the melting and boiling points for more precise calculations. If not using
+                      the phase diagram method, this option has no effect
     
     Returns:
     --------
         A tuple: melting_point, boiling_point in kelvin.
     """
+
+    # Resolve relative paths (if the user does not call .resolve() on their paths some issues can occur)
+    paths = [thermochimica_path, output_path, data_file]
+    for index, path in enumerate(paths):
+        if not path.is_absolute():
+            paths[index] = path.resolve()
+            
+    thermochimica_path, output_path, data_file = paths
 
     # This calculation works by computing the phase boundaries from a phase diagram (for which a tool already exists) rather than checking some phase
     # tolerance to determine when the liquid and gas phases first form
@@ -1078,9 +1098,14 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
             calc.extend(element_fractions)
             calcList.append(calc)
         thermoTools.WriteRunCalculationList('runThermochimica.ti',data_file,elements_used,calcList,tunit='K',punit='atm',munit='moles',printMode=0,fuzzyStoichiometry=True,gibbsMinCheck=False)
-        print('Thermochimica calculation initiated.')
+        if not suppress_output:
+            print('Thermochimica calculation initiated.')
         thermoTools.RunRunCalculationList('runThermochimica.ti', jsonName=str(output_path / output_name), thermochimica_path=str(thermochimica_path))
-        print('Thermochimica calculation finished.')
+        if not suppress_output:
+            print('Thermochimica calculation finished.')
+
+        # Now remove the output
+        os.remove('runThermochimica.ti')
 
         # Now read output and find the first occurrence of the liquid and gas phases
         calc = thermoOut(output_path / output_name)
