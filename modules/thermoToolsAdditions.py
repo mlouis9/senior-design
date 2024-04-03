@@ -131,6 +131,10 @@ class thermoOut:
                                             for state, phase_list in self.stable_phases.items() }
             self.stable_condensed_phases = {state: [ phase_tuple for phase_tuple in phase_list if phase_tuple[0] in self.output[state]['pure condensed phases'].keys()] \
                                             for state, phase_list in self.stable_phases.items() }
+            # Now normalize phase fractions
+            self.stable_solution_phases = self._normalize_phase_fractions(self.stable_solution_phases)
+            self.stable_condensed_phases = self._normalize_phase_fractions(self.stable_condensed_phases)
+
             self.mole_fraction_element_by_phase = self._get_mole_fraction_element_by_phase()
 
             # For each element, get fraction in solution phase (useful for corrosion calculations)
@@ -158,6 +162,15 @@ class thermoOut:
             self.solution_fraction_element = dict()
             self.elements = []
 
+    def _normalize_phase_fractions(self, phase_dict):
+        # Thermochimica prints moles of each phase rather than mole fractions, so this function is purely for converting to fractions
+        for state_key, state in phase_dict.items():
+            mole_sum = 0
+            for phase in state:
+                mole_sum += phase[1]
+            phase_dict[state_key] = [ ( phase[0], phase[1]/mole_sum, phase[2] ) for phase in phase_dict[state_key] ]
+        return phase_dict
+
     def add_output(self, out_file):
         """NOTE: This function does NOT check to see if states are unique before adding them to the output, it is possible
         to end up with duplicate states if this method is not used judiciously"""
@@ -176,7 +189,22 @@ class thermoOut:
             self.output.update({str(last_state + index + 1): state})
 
         self._reinitialize()
-
+        
+    def get_mole_fraction_element_in_phase(self, element, phase):
+        temperatures = []
+        mole_frac_phase = []
+        for state_index, state in self.mole_fraction_element_by_phase[element].items():
+            found_phase = False
+            temperatures.append(self.temperatures[state_index])
+            for phase_tuple in state:
+                phase_name, phase_fraction = phase_tuple
+                if phase_name == phase:
+                    mole_frac_phase.append(phase_fraction)
+                    found_phase = True
+            if not found_phase: # The given phase is not stable at this state
+                mole_frac_phase.append(0.0)
+        return temperatures, mole_frac_phase
+        
 
     def _get_stable_phases(self):
         # Below this tolerance, set phase fraction = 0
