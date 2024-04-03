@@ -22,7 +22,7 @@ input_file_name = "runThermochimica.ti"
 
 
 # Physical input parameters (same for all pseudo binary calcaultions)
-press = 100
+press = 1
 tunit = 'K'
 punit = 'atm'
 munit = 'moles'
