@@ -132,8 +132,8 @@ class thermoOut:
             self.stable_condensed_phases = {state: [ phase_tuple for phase_tuple in phase_list if phase_tuple[0] in self.output[state]['pure condensed phases'].keys()] \
                                             for state, phase_list in self.stable_phases.items() }
             # Now normalize phase fractions
-            self.stable_solution_phases = self._normalize_phase_fractions(self.stable_solution_phases)
-            self.stable_condensed_phases = self._normalize_phase_fractions(self.stable_condensed_phases)
+            self.stable_solution_phases, self.stable_condensed_phases = self._normalize_phase_fractions(
+                                                                        self.stable_solution_phases, self.stable_condensed_phases)
 
             self.mole_fraction_element_by_phase = self._get_mole_fraction_element_by_phase()
 
@@ -162,14 +162,16 @@ class thermoOut:
             self.solution_fraction_element = dict()
             self.elements = []
 
-    def _normalize_phase_fractions(self, phase_dict):
+    def _normalize_phase_fractions(self, solution_phase_dict, condensed_phase_dict):
         # Thermochimica prints moles of each phase rather than mole fractions, so this function is purely for converting to fractions
-        for state_key, state in phase_dict.items():
+        for (soln_key, soln_state), (condensed_key, condensed_state) in zip(solution_phase_dict.items(), condensed_phase_dict.items()):
             mole_sum = 0
-            for phase in state:
-                mole_sum += phase[1]
-            phase_dict[state_key] = [ ( phase[0], phase[1]/mole_sum, phase[2] ) for phase in phase_dict[state_key] ]
-        return phase_dict
+            for phase_type in [soln_state, condensed_state]:
+                for phase in phase_type:
+                    mole_sum += phase[1]
+            solution_phase_dict[soln_key] = [ ( phase[0], phase[1]/mole_sum, phase[2] ) for phase in solution_phase_dict[soln_key] ]
+            condensed_phase_dict[condensed_key] = [ ( phase[0], phase[1]/mole_sum, phase[2] ) for phase in condensed_phase_dict[condensed_key] ]
+        return solution_phase_dict, condensed_phase_dict
 
     def add_output(self, out_file):
         """NOTE: This function does NOT check to see if states are unique before adding them to the output, it is possible
@@ -190,7 +192,7 @@ class thermoOut:
 
         self._reinitialize()
         
-    def get_mole_fraction_element_in_phase(self, element, phase):
+    def get_phase_fraction_by_element(self, element, phase):
         temperatures = []
         mole_frac_phase = []
         for state_index, state in self.mole_fraction_element_by_phase[element].items():
@@ -204,6 +206,37 @@ class thermoOut:
             if not found_phase: # The given phase is not stable at this state
                 mole_frac_phase.append(0.0)
         return temperatures, mole_frac_phase
+    
+    def get_phase_fraction(self, phase_name):
+        """Get the molar fraction of each phase for all states
+        
+        Parameters:
+        -----------
+            phase_name: The string ID of the given phase
+        
+        Returns:
+        --------
+            A list containing the fraction of that phase for all states
+        """
+        phase_fractions = []
+        # First, assume its a solution phase
+        for state in self.stable_solution_phases.values():
+            phase_fraction = 0
+            for phase_tuple in state:
+                print(phase_tuple)
+                if phase_tuple[0] == phase_name:
+                    phase_fraction = phase_tuple[1]
+            phase_fractions.append(phase_fraction)
+        # If phase fraction is zero for all states, check the condensed phases
+        if all(phase_fraction == 0 for phase_fraction in phase_fractions) == 0:
+            for state in self.stable_condensed_phases:
+                phase_fraction = 0
+                for phase_tuple in state:
+                    if phase_tuple[0] == phase_name:
+                        phase_fraction = phase_tuple[1]
+                phase_fractions.append(phase_fraction)
+
+        return phase_fractions
         
 
     def _get_stable_phases(self):
