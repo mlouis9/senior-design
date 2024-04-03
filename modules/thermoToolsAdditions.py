@@ -223,12 +223,12 @@ class thermoOut:
         for state in self.stable_solution_phases.values():
             phase_fraction = 0
             for phase_tuple in state:
-                print(phase_tuple)
                 if phase_tuple[0] == phase_name:
                     phase_fraction = phase_tuple[1]
             phase_fractions.append(phase_fraction)
         # If phase fraction is zero for all states, check the condensed phases
-        if all(phase_fraction == 0 for phase_fraction in phase_fractions) == 0:
+        if all(phase_fraction == 0 for phase_fraction in phase_fractions) == True:
+            phase_fractions = []
             for state in self.stable_condensed_phases:
                 phase_fraction = 0
                 for phase_tuple in state:
