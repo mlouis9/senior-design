@@ -1061,9 +1061,10 @@ def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, outpu
 
 @resolve_paths
 def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, data_file, salt_composition: dict, \
-                                  elements_used: list, method: str='single composition', suppress_output=False, plot_diagram=False, \
-                                  tlo: float=0, thi: float=2500, ntstep: int=100, x_delta: float=0.1,  nxstep: int=20, \
-                                  pressure: float=1, liquid_phase: frozenset=None, gas_phase: frozenset=frozenset({'gas_ideal'})):
+                                  elements_used: list, method: str='single composition', suppress_output: bool=False, \
+                                  plot_diagram: bool=False, tlo: float=0, thi: float=2500, ntstep: int=100, x_delta: float=0.1, \
+                                  nxstep: int=20, pressure: float=1, liquid_phase: frozenset=None, \
+                                  gas_phase: frozenset=frozenset({'gas_ideal'}), phase_tolerance: float=0.9):
     """Utility for calculating the melting and boiling points of a salt of a given composition at a given pressure
     
     Parameters:
@@ -1080,6 +1081,10 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
         plot_diagram: If the intermediate phase diagram (used for calculating the melting and boiling points) should be plotted. This can be helpful for
                       determining the phases that occur near the melting and boiling points for more precise calculations. If not using
                       the phase diagram method, this option has no effect
+        phase_tolerance: A float (between 0 and 1) representing the fraction of a phase present that will represent a phase transition.
+                         E.g. if phase_tolerance = 0.9, the phase transition is considered to have occurred when 90 mole % (or more) of 
+                         thatphase is present. If this value is set to zero, the first time the given state is present in two adjacent
+                         states is considered the transition point.
     
     Returns:
     --------
@@ -1148,6 +1153,7 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
         try:
             melting_point = np.min(intersections)
             boiling_point = np.max(intersections)
+            return melting_point, boiling_point
         except: # There are no intersections
             raise ValueError("The liquid and/or gas phases were not present during the calculation, either the salt sublimates "
                              "or the incorrect liquid and or gas phases were specified.")
@@ -1190,39 +1196,52 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
         log = [] # Used for printing the stable phase at each point
         while searching_for_liquid or searching_for_gas:
             if index == len(states):
-                # First format logs for printing
-                if suppress_output:
-                    log = [] # Don't print logs
-                else:
-                    log = [ ' '.join(line) for line in log ]
-                    log = '\n'.join(log)
-                # One of the two was not assigned in the while loop, because the liquid_phase and/or gas_phase wasn't found
-                # Print the logs for debugging (maybe the incorrect phase names were supplied or the salt of interest sublimates)
-                raise ValueError("Either the specified liquid or gas phase was not present over the temperature range of the calculation. "
-                                f"The following phases were present throughout the calculation: \n{log}")
+                # to prevent indexing error in next line
+                break
             state = states[index]
 
             # Log stable solution phases (useful for debugging)
-            log.append( [ phase_tuple[0] for phase_tuple in calc.stable_solution_phases[state] ] )
+            log.append( [ phase_tuple[0] + f' {phase_tuple[1]:0.2f}' for phase_tuple in calc.stable_solution_phases[state] ] )
 
             # Now compute melting and boiling points
             for phase_tuple in calc.stable_solution_phases[state]:
                 if (phase_tuple[0] == liquid_phase) and searching_for_liquid:
-                    if found_liquid_in_last_state:
-                        searching_for_liquid = False
+                    if phase_tolerance == 0:
+                        if found_liquid_in_last_state:
+                            searching_for_liquid = False
+                        else:
+                            melting_point = calc.temperatures[state]
+                            found_liquid_in_last_state = True
                     else:
-                        melting_point = calc.temperatures[state]
-                        found_liquid_in_last_state = True
+                        if phase_tuple[1] >= phase_tolerance:
+                            melting_point = calc.temperatures[state]
+                            searching_for_liquid = False
                 if (phase_tuple[0] == gas_phase) and searching_for_gas:
-                    if found_gas_in_last_state:
-                        searching_for_gas = False
+                    if phase_tolerance == 0:
+                        if found_gas_in_last_state:
+                            searching_for_gas = False
+                        else:
+                            boiling_point = calc.temperatures[state]
+                            found_gas_in_last_state = True
                     else:
-                        boiling_point = calc.temperatures[state]
-                        found_gas_in_last_state = True
+                        if phase_tuple[1] >= phase_tolerance:
+                            boiling_point = calc.temperatures[state]
+                            searching_for_gas = False
             index += 1
-
-    # Regardless of the method, return the calculated  melting and boiling points
-    return melting_point, boiling_point
+    try:
+        return melting_point, boiling_point
+    except UnboundLocalError:
+         # First format logs for printing
+        if suppress_output:
+            log = [] # Don't print logs
+        else:
+            log = [ ' '.join(line) for line in log ]
+            log = '\n'.join(log)
+        # One of the two was not assigned in the while loop, because the liquid_phase and/or gas_phase wasn't found
+        # Print the logs for debugging (maybe the incorrect phase names were supplied or the salt of interest sublimates)
+        raise ValueError("Either the specified liquid or gas phase was not present over the temperature range of the calculation. "
+                        f"The following phases were present throughout the calculation: \n{log}")
+    
 
 def convert_to_thermochem_name(species_string):
     """Tool for converting from species names of the form """
