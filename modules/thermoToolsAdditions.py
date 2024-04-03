@@ -17,6 +17,7 @@ import sys
 from thermo.mixture import Mixture
 import re
 import warnings
+from functools import wraps
 
 # ---------------------
 # Customized Warnings
@@ -41,6 +42,16 @@ Author: Matthew Louis
 Email:" matthewlouis31@gmail.com
 """
 
+# A wrapper for automatically resolving any Path objects given as inputs (that are usually expected to be absolute paths, but
+# this can be cumbersome to require on the user side and is relatively easy to handle on the library side)
+def resolve_paths(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        new_args = [arg.resolve() if isinstance(arg, Path) else arg for arg in args]
+        new_kwargs = {k: v.resolve() if isinstance(v, Path) else v for k, v in kwargs.items()}
+        return func(*new_args, **new_kwargs)
+    return wrapper
+
 # ---------------------------------
 #           Classes
 # ---------------------------------
@@ -48,6 +59,7 @@ Email:" matthewlouis31@gmail.com
 class thermoOut:
     """A class for storing Thermochimica output, with methods for easily plotting
     and postprocessing"""
+    @resolve_paths
     def __init__(self, out_file: Path=None):
         """Initialize a thermoOut object
         
@@ -300,7 +312,7 @@ class pseudoBinaryDiagram(thermoOut):
 
         if (self.ntstep != 1) and (self.nxstep != 1):
             minstep = min(self.ntstep, self.nxstep)
-            self._filter_low_density_regions(30*minstep, int(minstep**2/300))
+            self._filter_low_density_regions(30*minstep, math.ceil(minstep**2/300)) # To prevent assigning min_samples = 0, need ceil
 
     def _filter_phase_points(self, threshold=0.1):
         """This function serves to eliminate points in phase regions that are far from the centroid of the rest of the points - which
@@ -834,7 +846,7 @@ def get_unique_elements(components: list) -> list:
     return list(elements)
 
 
-
+@resolve_paths
 def solubility_calculation(temp: float, press: float, unit_ratio_of_other_components: dict, component_to_vary: str, n_comp_step: int, \
                            thermochimica_path: Path, output_path: Path, output_name: str, data_file: Path, \
                            compstart: float=0.0, compstop: float=1.0, script_name: str="thermoInput.ti", \
@@ -910,6 +922,7 @@ def solubility_calculation(temp: float, press: float, unit_ratio_of_other_compon
 
     return output
 
+@resolve_paths
 def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, output_name: str, data_file: Path, xlo: float, xhi: float, nxstep: int, \
                               tlo: float, thi: float, ntstep: int, elements_used: list, left_endmember_composition: dict, \
                               right_endmember_composition: dict, press: float=1, tunit: str='K', punit: str='atm', munit: str='moles', \
@@ -985,6 +998,7 @@ def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, outpu
 
     return calc
 
+@resolve_paths
 def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, data_file, salt_composition: dict, \
                                   elements_used: list, method: str='single composition', suppress_output=False, plot_diagram=False, \
                                   tlo: float=0, thi: float=2500, ntstep: int=100, x_delta: float=0.1,  nxstep: int=20, \
@@ -1010,14 +1024,6 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
     --------
         A tuple: melting_point, boiling_point in kelvin.
     """
-
-    # Resolve relative paths (if the user does not call .resolve() on their paths some issues can occur)
-    paths = [thermochimica_path, output_path, data_file]
-    for index, path in enumerate(paths):
-        if not path.is_absolute():
-            paths[index] = path.resolve()
-
-    thermochimica_path, output_path, data_file = paths
 
     # This calculation works by computing the phase boundaries from a phase diagram (for which a tool already exists) rather than checking some phase
     # tolerance to determine when the liquid and gas phases first form
@@ -1153,7 +1159,7 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
                         boiling_point = calc.temperatures[state]
                         found_gas_in_last_state = True
             index += 1
-            
+
     # Regardless of the method, return the calculated  melting and boiling points
     return melting_point, boiling_point
 
