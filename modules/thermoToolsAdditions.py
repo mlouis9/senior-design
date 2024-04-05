@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import math
 from scipy.spatial import ConvexHull
 import scipy
-from shapely import Polygon, LineString, Point, MultiPoint
+from shapely import Polygon
 import alphashape
 from sklearn.cluster import DBSCAN
 from io import StringIO
@@ -1213,7 +1213,16 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
                             melting_point = calc.temperatures[state]
                             found_liquid_in_last_state = True
                     else:
-                        if phase_tuple[1] >= phase_tolerance:
+                        # If the MSCL/MSFL#3 phase is also present in this state, add it to the phase fraction
+                        phase_names = [phase_tuple[0] for phase_tuple in calc.stable_solution_phases[state]]
+                        if f"{liquid_phase}#3" in phase_names:
+                            phase_index = phase_names.index(f"{liquid_phase}#3")
+                            liquid_phase_fraction = phase_tuple[1] + calc.stable_solution_phases[state][phase_index][1]
+                        else:
+                            liquid_phase_fraction = phase_tuple[1]
+                        
+                        # Now check to see if liquid phase fraction is above tolerance
+                        if liquid_phase_fraction >= phase_tolerance:
                             melting_point = calc.temperatures[state]
                             searching_for_liquid = False
                 if (phase_tuple[0] == gas_phase) and searching_for_gas:
@@ -1238,7 +1247,7 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
             log = [ ' '.join(line) for line in log ]
             log = '\n'.join(log)
         # One of the two was not assigned in the while loop, because the liquid_phase and/or gas_phase wasn't found
-        # Print the logs for debugging (maybe the incorrect phase names were supplied or the salt of interest sublimates)
+        # Print the logs for debugging (maybe incorrect phase names were supplied or the salt of interest sublimates)
         raise ValueError("Either the specified liquid or gas phase was not present over the temperature range of the calculation. "
                         f"The following phases were present throughout the calculation: \n{log}")
     
