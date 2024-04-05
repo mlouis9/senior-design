@@ -30,5 +30,9 @@ T_m, T_b = tta.calculate_melting_and_boiling(thermochimica_path, output_path, ou
 print(f"Phase diagram method {T_m}, {T_b}")
 
 # Try this using the faster calclist method
-T_m, T_b = tta.calculate_melting_and_boiling(thermochimica_path, output_path, output_name, data_file, salt_composition, elements_used)
+T_m, T_b = tta.calculate_melting_and_boiling(thermochimica_path, output_path, output_name, data_file, salt_composition, elements_used, phase_tolerance=0)
 print(f"Fast method {T_m}, {T_b}")
+
+# Using a differrent phase tolerance (the default is 0.9)
+T_m, T_b = tta.calculate_melting_and_boiling(thermochimica_path, output_path, output_name, data_file, salt_composition, elements_used, phase_tolerance=0)
+print(f"Fast method with a nonzero phase tolerance {T_m}, {T_b}")
