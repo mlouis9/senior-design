@@ -6,7 +6,7 @@ import numpy as np
 from collections import Counter
 from thermo.mixture import Mixture
 
-from paths import THERMOCHIMICA, THERMOCHIMICA_FLUORIDE_DATA
+from paths import THERMOCHIMICA, THERMOCHIMICA_CHLORIDE_DATA
 
 # Used for storing outputs in the correct place regardless of where this script is called from
 script_dir = Path(__file__).parent
@@ -14,7 +14,7 @@ script_dir = Path(__file__).parent
 #=====================================================================================================
 # Path specifications
 
-dataFile = THERMOCHIMICA_FLUORIDE_DATA
+dataFile = THERMOCHIMICA_CHLORIDE_DATA
 scriptName = script_dir / "runThermochimica.ti"
 
 thermochimicaPath = THERMOCHIMICA
