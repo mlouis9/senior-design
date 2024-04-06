@@ -18,6 +18,7 @@ from thermo.mixture import Mixture
 import re
 import warnings
 from functools import wraps
+import traceback
 
 # ---------------------
 # Customized Warnings
@@ -39,7 +40,7 @@ project. This module extends the built-in thermochimica modules 'thermoTools' an
 a function for automatically executing a solubility calculation, and easily reading output.
 
 Author: Matthew Louis
-Email:" matthewlouis31@gmail.com
+Email: matthewlouis31@gmail.com
 """
 
 # A wrapper for automatically resolving any Path objects given as inputs (that are usually expected to be absolute paths, but
@@ -52,21 +53,114 @@ def resolve_paths(func):
         return func(*new_args, **new_kwargs)
     return wrapper
 
+def create_output_directory(path: Path):
+    """Function for creating the default output directory, which should be a directory named 'outputs' created adjacent
+    to the end caller (that is the python script that imports this module and uses it to do calculations)
+    
+    Parameters:
+    -----------
+        path: a Path object representing the parent directory of where the output directory should be created
+    
+    Returns:
+    --------
+        A path object corresponding to the outputs directory
+    """
+    
+    output_directory = path / 'outputs'
+
+    # Create the 'outputs' directory if it does not exist
+    output_directory.mkdir(parents=True, exist_ok=True)
+    return output_directory
+
+
+
 # ---------------------------------
 #           Classes
 # ---------------------------------
+
+# A meta class for error handling for unset configs (which are stored as class attributes of the Config class)
+class ConfigMeta(type):
+    def __getattribute__(cls, name):
+        if name.startswith("_Config__"):
+            default_name = name.replace("_Config__", "")
+            try:
+                value = super().__getattribute__(name)
+                if value is None:
+                    raise AttributeError(f"The attribute '{default_name}' has not been set. Please use the set_config function to set it.")
+                return value
+            except AttributeError:
+                raise AttributeError(f"The attribute '{default_name}' has not been set. Please use the set_config function to set it.")
+        elif name.startswith("_") and not name.startswith("__"):
+            default_name = name[1:]
+            mangled_name = f"_Config__{default_name}"
+            if hasattr(cls, mangled_name):
+                return super().__getattribute__(mangled_name)
+            else:
+                raise AttributeError(f"The attribute '_{default_name}' has not been set. Please use the set_config function to set it.")
+        return super().__getattribute__(name)
+
+
+# @ensure_configured  
+class Config(metaclass=ConfigMeta):
+
+    """This class configures class variables for the config class, which are then used by all other classes in this
+    directory. It is assumed that the user would prefer to set these once and have them apply to all calcaultions performed
+    with this module"""
+
+    __THERMOCHIMICA_PATH = None
+    __CALLER_PARENT_PATH = None
+    __OUTPUT_PATH = None
+    __OUTPUT_NAME = "output.json"
+    __DATA_FILE = None
+
+
+    @classmethod
+    def set_THERMOCHIMICA_PATH(cls, value):
+        cls.__THERMOCHIMICA_PATH = value
+
+    @classmethod
+    def set_DATA_FILE(cls, value):
+        cls.__DATA_FILE = value
+
+    @classmethod
+    def set_OUTPUT_PATH(cls, value):
+        cls.__OUTPUT_PATH = create_output_directory(value)
+        cls.__CALLER_PARENT_PATH = value
+
+    @classmethod
+    @resolve_paths
+    def set_config(cls, **kwargs):
+        """Function used for setting configs for the thermoToolsAdditions module. Valid configs are:
+            - thermochimica_path: Absolute path to the thermochimica directory. e.g. Path("/home/user/thermochimica")
+            - output_path: Path of the output directory (relative to the thermochimica/outputs directory). e.g. if the
+                           thermochimica_path is given as above, Path("../../myProject/outputs") would write thermochimica outputs to
+                           the 'outputs' subdirectory of the 'myProject' directory in the /home/user directory
+            - output_name: The name of the output file, e.g. \"output.json\"
+            - data_file: The path to the datafile (relative to the where this script is run) that is used to run the thermochimica calculation
+                         e.g. Path("data/MSTDB-TC_V3.0_Chlorides_No_Functions_8-2.dat")
+        """
+        for key, value in kwargs.items():
+            setter_name = f"set_{key.upper()}"
+            if hasattr(cls, setter_name) and isinstance(value, Path):
+                setter = getattr(cls, setter_name)
+                setter(value)
+            else:
+                raise AttributeError(f"{key} is not a valid configuration option or the value is not a Path instance.")
+
 
 class thermoOut:
     """A class for storing Thermochimica output, with methods for easily plotting
     and postprocessing"""
     @resolve_paths
-    def __init__(self, out_file: Path=None):
+    def __init__(self, out_file: Path=None, default=False):
         """Initialize a thermoOut object
         
         Parameters
         ----------
             outFile: The absolute path (or path relative to the python script utilizing this) to the
                      Thermochimica output .json file
+            default: If you want to use the default path, i.e. Config._OUTPUT_PATH / Config._OUTPUT_NAME, set to
+                     True, else an out_file is expected (unless initializing an empty thermoOut object)
         
         Returns
         -------
@@ -74,7 +168,9 @@ class thermoOut:
         """
 
         # If an outFile is not provided, do nothing
-        if out_file != None:
+        if ( out_file != None ) or default:
+            if default:
+                out_file = Config._OUTPUT_PATH / Config._OUTPUT_NAME
             # First read .json and save as .output attribute
             with open(str(out_file), 'r') as f:
                 self.output = json.load(f)
@@ -287,8 +383,8 @@ class thermoOut:
 
 class pseudoBinaryDiagram(thermoOut):
     """A class which extends thermoOut for use in making pseudo binary phase diagrams"""
-    def __init__(self, left_endmember_composition: dict, right_endmember_composition: dict, out_file: Path = None, plot_everything: bool = False, \
-                 ntstep=1, nxstep=1):
+    def __init__(self, left_endmember_composition: dict, right_endmember_composition: dict, out_file: Path = None, \
+                 default: bool=False, plot_everything: bool = False, ntstep=1, nxstep=1):
         """Initializes a pseudo binary phase diagram object from a given thermochimica output file
         
         Parameters:
@@ -307,7 +403,11 @@ class pseudoBinaryDiagram(thermoOut):
         self.plot_everything = plot_everything
 
         # First create a thermoOut object with the output file
-        super().__init__(out_file)
+        if out_file == None and default:
+            # Use the default filepath for reading the output file
+            super().__init__(default=default)
+        else:
+            super().__init__(out_file)
         self.left_endmember = left_endmember_composition
         self.right_endmember = right_endmember_composition
 
@@ -908,9 +1008,8 @@ def get_unique_elements(components: list) -> list:
 
 
 @resolve_paths
-def solubility_calculation(temp: float, press: float, unit_ratio_of_other_components: dict, component_to_vary: str, n_comp_step: int, \
-                           thermochimica_path: Path, output_path: Path, output_name: str, data_file: Path, \
-                           compstart: float=0.0, compstop: float=1.0, script_name: str="thermoInput.ti", \
+def solubility_calculation(temp: float, press: float, unit_ratio_of_other_components: dict, component_to_vary: str, n_comp_step: int,
+                           compstart: float=0.0, compstop: float=1.0, script_name: str="runThermochimica.ti", \
                            fuzzy: bool=False) -> thermoOut:
     """Function for performing a sequence of thermochimica calculations at a fixed temperature and pressure
     corresponding to varying one component of a system (e.g. PuCl3) while keeping the others in a fixed ratio
@@ -926,13 +1025,6 @@ def solubility_calculation(temp: float, press: float, unit_ratio_of_other_compon
                                         e.g. {'Na Cl': 0.8, 'Mg Cl_2': 0.2} corresponding to a ratio of 0.8:0.2 = 4:1
         component_to_vary: A string representing the component to vary e.g. 'Pu Cl_3'
         n_comp_setp: Number of composition steps to partition the composition interval [0,1] into
-        thermochimica_path: Absolute path to the thermochimica directory. e.g. Path("/home/user/thermochimica")
-        output_path: Path of the output directory (relative to the thermochimica/outputs directory). e.g. if the
-                     thermochimica_path is given as above, Path("../../myProject/outputs") would write thermochimica outputs to
-                     the 'outputs' subdirectory of the 'myProject' directory in the /home/user directory
-        output_name: The name of the output file, e.g. \"output.json\"
-        data_file: The path to the datafile (relative to the where this script is run) that is used to run the thermochimica calculation
-                   e.g. Path("data/MSTDB-TC_V3.0_Chlorides_No_Functions_8-2.dat")
         compstart: The initial mole fraction of `component_to_be_varied`
         compend: The final mole fraction of `component_to_be_varied`
         script_name: Name of the input script to be created in the directory where this script is run from, by default \"runThermochimica\"
@@ -943,6 +1035,14 @@ def solubility_calculation(temp: float, press: float, unit_ratio_of_other_compon
     --------
         A thermoOut object containing the results of the calculations in order as mol fraction of component_to_vary groes from 0 to 1
     """
+
+    data_file = Config._DATA_FILE
+    thermochimica_path = Config._THERMOCHIMICA_PATH
+    output_path = Config._OUTPUT_PATH
+    output_name = Config._OUTPUT_NAME
+
+    # Name of the first external python script to call this function, want to use this to create input script adjacent to that file
+    caller_parent_path = Config._CALLER_PARENT_PATH 
 
     # Get unique elements and a list of components
     components = list(unit_ratio_of_other_components.keys()) + [component_to_vary]
@@ -967,24 +1067,18 @@ def solubility_calculation(temp: float, press: float, unit_ratio_of_other_compon
         npstep = 1
         masses = component_fractions_to_element_fractions(components, unique_elements)
         
-        thermoTools.WriteInputScript(script_name, str(data_file), unique_elements, \
+        thermoTools.WriteInputScript(str(caller_parent_path / script_name), str(data_file), unique_elements, \
                                      tstart, tend, ntstep, pstart, pend, npstep, masses, fuzzyStoichiometry=fuzzy)
 
         # Run script
-        thermoTools.RunInputScript(script_name, jsonName=str(output_path / output_name), thermochimica_path=str(thermochimica_path),
+        thermoTools.RunInputScript(str(caller_parent_path / script_name), jsonName=str(output_path / output_name), thermochimica_path=str(thermochimica_path),
                                    noOutput=True)
 
-        output_json_path = thermochimica_path / 'outputs' / output_path / output_name
-        output.add_output(output_json_path)
-
-    # Now remove run script and output
-    os.remove(script_name)
-    os.remove(str(output_path / output_name))
+        output.add_output(output_path / output_name)
 
     return output
 
-@resolve_paths
-def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, output_name: str, data_file: Path, xlo: float, xhi: float, nxstep: int, \
+def pseudo_binary_calculation(xlo: float, xhi: float, nxstep: int, \
                               tlo: float, thi: float, ntstep: int, elements_used: list, left_endmember_composition: dict, \
                               right_endmember_composition: dict, press: float=1, tunit: str='K', punit: str='atm', munit: str='moles', \
                               input_file_name: str='runThermochimica.ti', fuzzy: bool=True, thermochimica_plotting=False) -> pbpd.diagram:
@@ -993,10 +1087,6 @@ def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, outpu
     
     Parameters:
     -----------
-        thermochimica_path: An absolute path to the thermochimica directory
-        output_path: An absolute path to the directory where the output .json file should be stored
-        output_name: The desired name of the output file (by default output.json)
-        data_file: An absolute path to the thermochimica data directory
         xlo: The low composition (usually 0.0)
         xhi: The high composition (usually 1.0)
         nxstep: The number of composition steps to partition the interval [xlo, xhi] into
@@ -1021,6 +1111,12 @@ def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, outpu
         A pseudo binary phase diagram object containing the relevant calculation results
 
     """
+    data_file = Config._DATA_FILE
+    thermochimica_path = Config._THERMOCHIMICA_PATH
+    output_path = Config._OUTPUT_PATH
+    output_name = Config._OUTPUT_NAME
+    caller_script = Config._CALLER_PARENT_PATH
+
     left_endmember_masses = component_fractions_to_element_fractions(left_endmember_composition, elements_used)
     right_endmember_masses = component_fractions_to_element_fractions(right_endmember_composition, elements_used)
 
@@ -1054,13 +1150,9 @@ def pseudo_binary_calculation(thermochimica_path: Path, output_path: Path, outpu
     calc.initRun(press, tunit, punit, plane, sum1, sum2, mint, maxt, elements_used, mass_labels, munit, tshift, fuzzy=fuzzy)
     calc.runCalc(xlo, xhi, nxstep, tlo, thi, ntstep)
 
-    # Now remove the input file
-    os.remove(input_file_name)
-
     return calc
 
-@resolve_paths
-def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, data_file, salt_composition: dict, \
+def calculate_melting_and_boiling(salt_composition: dict, \
                                   elements_used: list, method: str='single composition', suppress_output: bool=False, \
                                   plot_diagram: bool=False, tlo: float=0, thi: float=2500, ntstep: int=100, x_delta: float=0.1, \
                                   nxstep: int=20, pressure: float=1, liquid_phase: frozenset=None, \
@@ -1069,10 +1161,6 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
     
     Parameters:
     -----------
-        thermochimica_path: 
-        output_path:
-        output_name:
-        data_file:
         salt_composition:
         elements_used:
         method: The method used to calculate the melting and boiling points. Can be either 'single composition' (preferred for 
@@ -1094,6 +1182,11 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
     # This calculation works by computing the phase boundaries from a phase diagram (for which a tool already exists) rather than checking some phase
     # tolerance to determine when the liquid and gas phases first form
     
+    data_file = Config._DATA_FILE
+    thermochimica_path = Config._THERMOCHIMICA_PATH
+    output_path = Config._OUTPUT_PATH
+    output_name = Config._OUTPUT_NAME
+
     if liquid_phase == None:
         # The default liquid phase depends on the datafile used (i.e. chloride or fluoride), so
         # this should be updated to be MSCL or MSFL accordingly
@@ -1119,7 +1212,7 @@ def calculate_melting_and_boiling(thermochimica_path, output_path, output_name, 
         left_endmember_composition = salt_composition
         right_endmember_composition = new_endmember_composition
 
-        calc = pseudo_binary_calculation(thermochimica_path, output_path, output_name, data_file, xlo, xhi, nxstep, tlo, thi, ntstep, elements_used,\
+        calc = pseudo_binary_calculation(xlo, xhi, nxstep, tlo, thi, ntstep, elements_used,\
                                     left_endmember_composition, right_endmember_composition)
         diagram = pseudoBinaryDiagram(left_endmember_composition, right_endmember_composition, output_path / output_name, \
                                         plot_everything=1, ntstep=ntstep, nxstep=nxstep)

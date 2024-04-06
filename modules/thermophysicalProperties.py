@@ -14,7 +14,9 @@ import numpy as np
 """ This is a module for reading and calculating thermophysical properties from the MSTDB using ideal estimations (e.g. 
 additivity of molar volumes) and the RK expansion for estimating the effects nonideal mixing.
 
-Author: Matthew Louis"""
+Author: Matthew Louis
+Email: matthewlouis31@gmail.com
+"""
 
 ureg = pint.UnitRegistry(auto_reduce_dimensions=True)
 ureg.default_format = "~P"
