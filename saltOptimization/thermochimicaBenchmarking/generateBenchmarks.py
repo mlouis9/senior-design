@@ -4,21 +4,16 @@ import json
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
-import os
-import sys
+from paths import THERMOCHIMICA, THERMOCHIMICA_CHLORIDE_DATA
 
-# Get the script name from sys.argv
-script_name = sys.argv[0]
-
-# Get the absolute path of the script
-script_dir = Path(os.path.abspath(script_name)).resolve().parent
+script_dir = Path(__file__).parent
 
 # File IO input parameters
-thermochimica_path = script_dir / "../../thermochimica"
-output_path = ( script_dir / '../outputs' ).resolve()
-output_name = 'output.json'
-data_file = ( script_dir / "../../thermochimica/data/MSTDB-TC_V3.0_Chlorides_No_Functions_8-2.dat" ).resolve()
-input_file_name = "runThermochimica.ti"
+tta.Config.set_config(
+    thermochimica_path = THERMOCHIMICA,
+    output_path= script_dir,
+    data_file = THERMOCHIMICA_CHLORIDE_DATA,
+)
 
 
 # Physical input parameters (same for all pseudo binary calcaultions)
@@ -29,10 +24,10 @@ munit = 'moles'
 
 xlo = 0.0
 xhi = 1.0
-nxstep = 120
+nxstep = 20
 tlo = 500
 thi = 1200
-ntstep = 120
+ntstep = 20
 
 # Define cases, i.e. all of the pseudo binary systems shown in Zhang
 cases = [(['K', 'Cl', 'Pu'], {'K Cl': 1.0}, {'Pu Cl_3': 1.0}), \
@@ -48,14 +43,14 @@ for case_index, case in enumerate(cases):
     right_endmember_composition = case[2]
 
     # Run thermochimica calculation
-    calc = tta.pseudo_binary_calculation(thermochimica_path, output_path, output_name, data_file, xlo, xhi, nxstep, tlo, thi, ntstep, elements_used,\
+    calc = tta.pseudo_binary_calculation(xlo, xhi, nxstep, tlo, thi, ntstep, elements_used,\
                                 left_endmember_composition, right_endmember_composition)
 
     # Now load output.json and plot
 
     # Plot region diagram
-    loaded_output = tta.thermoOut(output_path / output_name)
-    diagram = tta.pseudoBinaryDiagram(left_endmember_composition, right_endmember_composition, output_path / output_name, \
+    loaded_output = tta.thermoOut(default=True)
+    diagram = tta.pseudoBinaryDiagram(left_endmember_composition, right_endmember_composition, default=True, \
                                     plot_everything=case_index == 3, ntstep=ntstep, nxstep=nxstep)
     diagram.plot_phase_regions(plot_marker='.', plot_mode='region')
     diagram.plot.fig.savefig(str(script_dir / f"plots/{case_names[case_index]}Region"), bbox_inches='tight')

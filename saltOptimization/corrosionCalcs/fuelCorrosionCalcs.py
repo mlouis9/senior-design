@@ -5,21 +5,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 from collections import Counter
 from thermo.mixture import Mixture
-import os, sys
 
-# Get the script name from sys.argv
-script_name = sys.argv[0]
+from paths import THERMOCHIMICA, THERMOCHIMICA_FLUORIDE_DATA
 
-# Get the absolute path of the script
-script_dir = Path(os.path.abspath(script_name)).resolve().parent
+# Used for storing outputs in the correct place regardless of where this script is called from
+script_dir = Path(__file__).parent
 
 #=====================================================================================================
 # Path specifications
 
-dataFile = script_dir / "../../thermochimica/data/MSTDB-TC_V3.0_Chlorides_No_Functions_8-2.dat"
+dataFile = THERMOCHIMICA_FLUORIDE_DATA
 scriptName = script_dir / "runThermochimica.ti"
 
-thermochimicaPath = script_dir / "../../thermochimica"
+thermochimicaPath = THERMOCHIMICA
 outputPath = script_dir / "outputs"
 
 #=====================================================================================================
