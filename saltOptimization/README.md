@@ -3,9 +3,9 @@ This directory contains all of the calculations relevant to the optimization of 
 
 ## Table of Contents
 
-- [benchmarking](benchmarking/README.md)
 - [boilingAndMeltingPoints](boilingAndMeltingPoints/README.md)
 - [corrosionCalcs](corrosionCalcs/README.md)
+- [thermochimicaBenchmarking](thermochimicaBenchmarking/README.md)
 - [thermophysicalProperties](thermophysicalProperties/README.md)
   - [benchmarking](thermophysicalProperties/benchmarking/README.md)
 

@@ -1,0 +1,5 @@
+[project]
+name = "senior-design"
+version = "0.1.0"
+authors = [{name = "Matthew Louis", email = "matthewlouis31@gmail.com"}]
+description = "All of the code necessary for recreating the calculations done for my NRE 4351 senior design project"
