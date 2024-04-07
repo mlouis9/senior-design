@@ -24,10 +24,10 @@ munit = 'moles'
 
 xlo = 0.0
 xhi = 1.0
-nxstep = 20
+nxstep = 120
 tlo = 500
 thi = 1200
-ntstep = 20
+ntstep = 120
 
 # Define cases, i.e. all of the pseudo binary systems shown in Zhang
 cases = [(['K', 'Cl', 'Pu'], {'K Cl': 1.0}, {'Pu Cl_3': 1.0}), \

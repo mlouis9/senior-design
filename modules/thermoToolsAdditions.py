@@ -18,7 +18,6 @@ from thermo.mixture import Mixture
 import re
 import warnings
 from functools import wraps
-import traceback
 
 # ---------------------
 # Customized Warnings
@@ -102,9 +101,8 @@ class ConfigMeta(type):
 
 # @ensure_configured  
 class Config(metaclass=ConfigMeta):
-
     """This class configures class variables for the config class, which are then used by all other classes in this
-    directory. It is assumed that the user would prefer to set these once and have them apply to all calcaultions performed
+    module. It is assumed that the user would prefer to set these once and have them apply to all calcaultions performed
     with this module"""
 
     __THERMOCHIMICA_PATH = None
