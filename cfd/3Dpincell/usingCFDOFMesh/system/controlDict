@@ -13,9 +13,9 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     foamRun;
+application     buoyantFoam;
 
-solver          incompressibleFluid;
+solver          buoyantBoussinesqSimpleFoam;
 
 startFrom       startTime;
 

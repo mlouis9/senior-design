@@ -13,4 +13,4 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-#include "turbulenceProperties"
+simulationType laminar;
