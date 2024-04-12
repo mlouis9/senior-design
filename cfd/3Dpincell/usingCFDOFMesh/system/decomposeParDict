@@ -13,9 +13,14 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-numberOfSubdomains  4;
+numberOfSubdomains  48;
 
-method              scotch;
+method              simple;
+
+coeffs
+{
+        n           (1 1 48);
+}
 
 
 // ************************************************************************* //

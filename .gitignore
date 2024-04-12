@@ -4,6 +4,9 @@
 # Do not ignore the '0' directory
 !0/
 
+# Ignore processor directories
+processor*
+
 # Ignore thermochimica input and ouput .json files
 *.ti
 *.json
