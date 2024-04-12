@@ -41,9 +41,10 @@ boundaryField
 
     outlet
     {
+        // Value is taken from the internal field unless there is backflow
         type        inletOutlet;
-        inletValue  uniform 1200.0;
-        value       uniform 1200.0;
+        inletValue  uniform 1200.0; // This value is only used during backflow
+        value       $internalField; // Dynamically use internal field
     }
 
     defaultFaces

@@ -18,9 +18,9 @@ thermoType
     type            heRhoThermo;
     mixture         pureMixture;
     specie          specie;
-    equationOfState perfectGas;
-    thermo          hConst;
-    transport       sutherland;
+    equationOfState icoPolynomial;
+    thermo          hPolynomial;
+    transport       polynomial;
     energy          sensibleEnthalpy;
 }
 
@@ -34,13 +34,22 @@ mixture
    }
    thermodynamics
    {
-       Cp              1004.703;
-       Hf              0;
+       CpCoeffs<8>    (1.84947141e+03  1.03187842e-09 -3.80570898e-12  8.19691526e-15
+                       0.0             0.0             0.0             0.0);
+       Hf              0; // Assume zero, shouldn't matter for this simulation
+       Sf              0; // Entropy of formation, also assume zero
    }
    transport
    {
-       As              1.4579326545176254e-06;
-       Ts              110.4;
+       muCoeffs<8>     (2.57031592e+00 -1.84118251e-02  5.99116980e-05 -1.15814888e-07
+                        1.46732762e-10  0.0             0.0             0.0);
+       kappaCoeffs<8>  (1.36035899e+00 -3.21222624e-04  0.0             0.0
+                        0.0             0.0             0.0             0.0);
+   }
+   equationOfState
+   {
+       rhoCoeffs<8>     (2.62624915e+03 -6.12287310e-01 -6.59982186e-07 -6.64646978e-11
+                        -1.46525762e-13  1.13518532e-16 -8.93703097e-20  4.34420323e-23);
    }
 }
 
