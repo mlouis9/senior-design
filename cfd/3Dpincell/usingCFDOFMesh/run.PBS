@@ -1,0 +1,14 @@
+#!/bin/bash
+#PBS -l select=1:ncpus=48:mpiprocs=48
+#PBS -N 3Dpincell
+#PBS -l walltime=24:00:00
+#PBS -j oe
+#PBS -P edu_res
+
+cat $PBS_NODEFILE
+
+cd $PBS_O_WORKDIR
+
+export TMPDIR=/tmp
+
+mpirun -N 48 buoyantSimpleFoam
