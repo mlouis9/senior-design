@@ -9,13 +9,13 @@ FoamFile
     version     2.0;
     format      ascii;
     class       volScalarField;
-    object      T;
+    object      p_rgh;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 0 0 1 0 0 0];
+dimensions      [1 -1 -2 0 0 0 0];
 
-internalField   uniform 290.0;
+internalField   uniform 100000.0;
 
 boundaryField
 {
@@ -28,27 +28,25 @@ boundaryField
 
     wall
     {
-        type        fixedGradient;
-        gradient    uniform 280000.0;
+        type        fixedFluxPressure;
+        value       $internalField;
     }
 
     inlet
     {
-        type        inletOutlet;
-        inletValue  uniform 850.0;
-        value       uniform 850.0;
+        type        fixedFluxPressure;
+        value       $internalField;
     }
 
     outlet
     {
-        type        inletOutlet;
-        inletValue  uniform 1200.0;
-        value       uniform 1200.0;
+        type        fixedValue;
+        value       $internalField;
     }
 
     defaultFaces
     {
-        type        zeroGradient;
+        type        fixedFluxPressure;
         value       $internalField;
     }
 
