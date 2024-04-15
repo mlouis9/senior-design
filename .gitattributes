@@ -1,11 +1,1 @@
-polyMesh/boundary filter=lfs diff=lfs merge=lfs -text
-polyMesh/owner filter=lfs diff=lfs merge=lfs -text
-polyMesh/points filter=lfs diff=lfs merge=lfs -text
-polyMesh/pointZones filter=lfs diff=lfs merge=lfs -text
-polyMesh/sets filter=lfs diff=lfs merge=lfs -text
-polyMesh/cellProc filter=lfs diff=lfs merge=lfs -text
-polyMesh/cellZones filter=lfs diff=lfs merge=lfs -text
-polyMesh/faces filter=lfs diff=lfs merge=lfs -text
-polyMesh/faceZones filter=lfs diff=lfs merge=lfs -text
-polyMesh/neighbour filter=lfs diff=lfs merge=lfs -text
 **/polyMesh/** filter=lfs diff=lfs merge=lfs -text
