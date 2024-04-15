@@ -15,7 +15,7 @@ FoamFile
 
 dimensions      [1 -1 -2 0 0 0 0];
 
-internalField   uniform 101325.0; // (Pa) atmospheric pressure
+internalField   uniform 100000.0;
 
 boundaryField
 {

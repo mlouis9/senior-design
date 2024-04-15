@@ -13,9 +13,7 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-application     buoyantFoam;
-
-solver          buoyantBoussinesqSimpleFoam;
+application     buoyantSimpleFoam;
 
 startFrom       startTime;
 
@@ -29,7 +27,7 @@ endTime         100000;
 
 writeControl    timeStep;
 
-writeInterval   100;
+writeInterval   1000;
 
 purgeWrite      0;
 
@@ -38,6 +36,58 @@ writeFormat     ascii;
 writePrecision  15;
 
 runTimeModifiable true;
+
+libs
+(
+    // Needed for availability of porous baffle boundary in potentialFoam
+    #include "turbulenceLib"
+);
+
+functions
+{
+    fieldAverage1
+    {
+        type            fieldAverage;
+        functionObjectLibs ("libfieldFunctionObjects.so");
+        enabled         true;
+        outputControl   outputTime;
+        outputInterval  1;
+        fields
+        (
+            T
+            {
+                mean        on;
+            }
+        );
+    }
+
+    cuttingPlane1
+    {
+        type            surfaces;
+        functionObjectLibs ("libsampling.so");
+        outputControl   outputTime;
+        outputInterval  1;
+
+        interpolationScheme cellPoint;
+
+        surfaces
+        (
+            horizontalPlane1
+            {
+                type        cuttingPlane;
+                planeType   pointAndNormal;
+                pointAndNormalDict
+                {
+                    basePoint   (0 0 0.1);  // Example height, adjust as needed
+                    normalVector (0 0 1);
+                }
+                interpolate true;
+            }
+            // Add more planes as needed
+        );
+        fields          (TMean);  // Assumes you're averaging T and outputting TMean
+    }
+}
 
 
 // ************************************************************************* //

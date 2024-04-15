@@ -29,22 +29,21 @@ boundaryField
     wall
     {
         type        fixedGradient;
-        gradient    uniform 280000.0;
+        gradient    uniform 18000.0;
     }
 
     inlet
     {
         type        inletOutlet;
-        inletValue  uniform 850.0;
-        value       uniform 850.0;
+        inletValue  uniform 800.0;
+        value       uniform 800.0;
     }
 
     outlet
     {
-        // Value is taken from the internal field unless there is backflow
         type        inletOutlet;
-        inletValue  uniform 1200.0; // This value is only used during backflow
-        value       $internalField; // Dynamically use internal field
+        inletValue  uniform 1200.0;
+        value       uniform 1200.0;
     }
 
     defaultFaces

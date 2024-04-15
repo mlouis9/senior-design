@@ -42,9 +42,9 @@ boundaryField
         normalVelocity
         {
             type            fixedValue;
-            value           uniform ( 0.0 0.0 0.01 );
+            value           uniform ( 0.0 0.0 1.0 );
         }
-        value               uniform ( 0.0 0.0 0.01 );
+        value               uniform ( 0.0 0.0 1.0 );
     }
 
     outlet
