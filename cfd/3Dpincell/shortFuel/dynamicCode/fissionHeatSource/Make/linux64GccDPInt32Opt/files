@@ -1,0 +1,6 @@
+# dynamicCode:
+# SHA1 = ba3f8712cb66180f7252d01150943bead3a78fa2
+
+SOURCE += codedFvModelTemplate.C
+
+LIB = $(PWD)/../platforms/$(WM_OPTIONS)/lib/libfissionHeatSource_ba3f8712cb66180f7252d01150943bead3a78fa2

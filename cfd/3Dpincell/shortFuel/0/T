@@ -29,7 +29,7 @@ boundaryField
     circularWall
     {
         type        fixedGradient;
-        gradient    uniform -218000.0;
+        gradient    uniform 218000.0;
     }
 
     defaultFaces
