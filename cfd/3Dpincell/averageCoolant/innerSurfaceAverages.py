@@ -2,6 +2,9 @@ from paraview.simple import *
 import numpy as np
 import csv
 import os
+from paths import AVERAGE_COOLANT_CASE
+
+os.chdir(AVERAGE_COOLANT_CASE)
 
 # Create a new 'Open FOAM Reader'
 averageCoolantfoam = OpenFOAMReader(registrationName='averageCoolant.foam', FileName='/home/mlouis9/PythonProjects/senior-design/cfd/3Dpincell/averageCoolant/averageCoolant.foam')

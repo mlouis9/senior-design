@@ -72,3 +72,9 @@ THERMOCHIMICA_FLUORIDE_DATA = here(f"thermochimica/data/{fluoride_database}")
 MSTDB_TP_DATA = here("mstdb-tp/Molten_Salt_Thermophysical_Properties.csv")
 MSTDB_TP_RK_DATA = here("mstdb-tp/Molten_Salt_Thermophysical_Properties_RK.csv")
 SALT_OPTIMIZATION = here("saltOptimization")
+
+# ----------
+# CFD Cases
+# ----------
+
+AVERAGE_COOLANT_CASE = here("cfd/3Dpincell/averageCoolant")

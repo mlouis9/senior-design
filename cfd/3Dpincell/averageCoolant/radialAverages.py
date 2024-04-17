@@ -2,6 +2,9 @@ from paraview.simple import *
 import numpy as np
 import csv
 import os
+from paths import AVERAGE_COOLANT_CASE
+
+os.chdir(AVERAGE_COOLANT_CASE)
 
 # Create a new 'Open FOAM Reader'
 averageCoolantfoam = OpenFOAMReader(registrationName='averageCoolant.foam', FileName='/home/mlouis9/PythonProjects/senior-design/cfd/3Dpincell/averageCoolant/averageCoolant.foam')
@@ -37,7 +40,9 @@ for z in np.arange(0, 3.1, 0.1):
     extracted_files.append(extracted_file)
 
 # Combine the extracted CSV files into a single file with an additional column for z height
-os.mkdir('extracts')
+if not os.path.exists('extracts'):
+    os.mkdir('extracts')
+
 with open('extracts/radial_averaged_data.csv', 'w', newline='') as combined_file:
     writer = csv.writer(combined_file)
     
