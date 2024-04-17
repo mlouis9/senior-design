@@ -40,8 +40,8 @@ boundaryField
 
     outlet
     {
-        type        calculated;
-        value       $internalField;
+        type        fixedValue;
+        value       uniform 101325;
     }
 
     defaultFaces
