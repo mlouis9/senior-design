@@ -15,7 +15,7 @@ FoamFile
 
 dimensions      [0 0 0 1 0 0 0];
 
-internalField   uniform 290.0;
+internalField   uniform 800.0;
 
 boundaryField
 {
@@ -42,8 +42,8 @@ boundaryField
     outlet
     {
         type        inletOutlet;
-        inletValue  uniform 1200.0;
-        value       uniform 1200.0;
+        inletValue  uniform 857.0;
+        value       uniform 857.0;
     }
 
     defaultFaces
