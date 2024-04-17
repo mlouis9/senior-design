@@ -603,7 +603,7 @@ class Database:
         self.data = self._parser._parse_mstdb_tp(mstdb_tp_path)
         self.rk = self._parser._parse_mstdb_tp_rk(mstdb_tp_rk_path)
 
-    def get_tp(self, thermophysical_property: str, composition_dict: dict) -> Callable[[float], float]:
+    def get_tp(self, thermophysical_property: str, composition_dict: dict, uncertainty=True) -> Callable[[float], float]:
         """A function for evaluating thermophysical properties for a given salt composition
         using the database
         
@@ -612,6 +612,8 @@ class Database:
             thermophysical_property: Can take the values: {UNIQUE_TP_NAMES}
             composition_dict: A composition dict corresponding to an arbitrary molten salt (with an arbitrary composition)
                               whose endmembers are in the database
+            uncertainty: A boolean dictating whether the thermofunction that is returned returns properties with uncertainties
+                         or just their nominal/average value (this is mainly for convenience)
         
         Returns:
         --------
@@ -712,6 +714,16 @@ class Database:
                 # Calculate the contribution to the excess density from each binary subsystem
                 excess_density_contribution = self._excess_density_contribution(binary_subsystem)
                 ideal_property += excess_density_contribution
+
+        # A wrapper that extracts the nominal values from thermofunctions
+        def extract_nominal_value(func):
+            def wrapper(x):
+                y_with_uncertainty = func(x)
+                return y_with_uncertainty.nominal_value  # Extract the nominal value
+            return wrapper
+
+        if not uncertainty:
+            ideal_property = extract_nominal_value(ideal_property)
 
         return ideal_property
         
