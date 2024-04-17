@@ -10,6 +10,7 @@ from itertools import combinations
 from uncertainties import ufloat, unumpy
 import matplotlib.pyplot as plt
 import numpy as np
+from numdifftools import Derivative
 
 """ This is a module for reading and calculating thermophysical properties from the MSTDB using ideal estimations (e.g. 
 additivity of molar volumes) and the RK expansion for estimating the effects nonideal mixing.
@@ -141,7 +142,7 @@ class ThermoFunction(ArbitraryThermoFunction):
     # replaced with 'viscosity'. This class attribute keeps track of when this occurs.
     has_been_parsed = False
     
-    def __init__(self, salt, key):
+    def __init__(self, salt, key: str):
         self.salt = salt
         self.key = key
         
@@ -325,14 +326,16 @@ class Database:
         'viscosity_base10': 'Pa*s',
         'density': 'kg/m^3',
         'thermal_conductivity': 'W/(m*K)',
-        'liquid_heat_capacity': 'J/(kg*K)'
+        'liquid_heat_capacity': 'J/(kg*K)',
+        'beta': '1/K'
     }
     
     _UNIQUE_TP_NAMES = [
         'viscosity',
         'density',
         'thermal_conductivity',
-        'liquid_heat_capacity'
+        'liquid_heat_capacity',
+        'beta'
     ]
 
     _CSV_VALUES = {
@@ -609,17 +612,36 @@ class Database:
         
         Parameters:
         -----------
-            thermophysical_property: Can take the values: {UNIQUE_TP_NAMES}
-            composition_dict: A composition dict corresponding to an arbitrary molten salt (with an arbitrary composition)
-                              whose endmembers are in the database
-            uncertainty: A boolean dictating whether the thermofunction that is returned returns properties with uncertainties
-                         or just their nominal/average value (this is mainly for convenience)
+            - thermophysical_property:
+                Can take the values:
+                - viscosity
+                - density
+                - thermal_conductivity
+                - liquid_heat_capacity
+                - beta\\
+                Note that beta is the coefficient of thermal expansion (i.e. -1/rho*d rho/d T)
+            - composition_dict: A composition dict corresponding to an arbitrary molten salt (with an arbitrary composition)
+                                whose endmembers are in the database
+            - uncertainty: A boolean dictating whether the thermofunction that is returned returns properties with uncertainties
+                           or just their nominal/average value (this is mainly for convenience)
         
         Returns:
         --------
-            A function that takes the temperature in K and returns the thermophysical property of interest in SI units. For
-            clarity, the units are given in the .units attribute of the function
+            - A function that takes the temperature in K and returns the thermophysical property of interest in SI units. For
+              clarity, the units are given in the .units attribute of the function
         """
+
+        # ----------------------------------------
+        # Logic for thermal expansion coefficient
+        # ----------------------------------------
+
+        # Since, to calculate the thermal expansion coefficient, all that's needed is the density (and its derivative), we overwrite the
+        # thermophysical property string so that, at the end, ideal_property is the density
+        is_beta = False
+        if thermophysical_property == 'beta':
+            is_beta = True
+            thermophysical_property = 'density'
+
 
         # ----------------------------------------------------------
         # First perform checks on the input to make sure it's valid
@@ -721,7 +743,22 @@ class Database:
                 y_with_uncertainty = func(x)
                 return y_with_uncertainty.nominal_value  # Extract the nominal value
             return wrapper
+        
+        # If property is beta, then compute beta using numdiff tools
+        if is_beta:
+            # NOTE: currently there's no error propagation when calculating the derivative, the only error comes from the denominator
 
+            # Since Derivative outputs a numpy array, we create a new function that outputs a float, so that we can make it a thermo function
+            def drhodTfloat(T):
+                return -float(Derivative(extract_nominal_value(ideal_property))(T))/ideal_property(T)
+
+            # Now create a thermofunction using the properties of ideal_property
+            beta = ArbitraryThermoFunction(drhodTfloat, ideal_property.min_temp, ideal_property.max_temp, units=Database._TP_UNITS['beta'])
+            if not uncertainty:
+                beta = extract_nominal_value(beta)
+            
+            return beta
+        
         if not uncertainty:
             ideal_property = extract_nominal_value(ideal_property)
 
