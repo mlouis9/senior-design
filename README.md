@@ -3,12 +3,14 @@ This repository contains all of the code necessary for reproducing the calculati
 
 ## Table of Contents
 
-- [coreHeightScoping](coreHeightScoping/README.md)
 - [saltOptimization](saltOptimization/README.md)
-  - [benchmarking](saltOptimization/benchmarking/README.md)
+  - [boilingAndMeltingPoints](saltOptimization/boilingAndMeltingPoints/README.md)
   - [corrosionCalcs](saltOptimization/corrosionCalcs/README.md)
+  - [thermochimicaBenchmarking](saltOptimization/thermochimicaBenchmarking/README.md)
   - [thermophysicalProperties](saltOptimization/thermophysicalProperties/README.md)
     - [benchmarking](saltOptimization/thermophysicalProperties/benchmarking/README.md)
+- [scoping](scoping/README.md)
+  - [coreHeight](scoping/coreHeight/README.md)
 
 ## Requirements
 
