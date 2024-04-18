@@ -3,6 +3,9 @@ This repository contains all of the code necessary for reproducing the calculati
 
 ## Table of Contents
 
+- [cfd](cfd/README.md)
+  - [3Dpincell](cfd/3Dpincell/README.md)
+    - [averageCoolant](cfd/3Dpincell/averageCoolant/README.md)
 - [saltOptimization](saltOptimization/README.md)
   - [boilingAndMeltingPoints](saltOptimization/boilingAndMeltingPoints/README.md)
   - [corrosionCalcs](saltOptimization/corrosionCalcs/README.md)
@@ -10,7 +13,6 @@ This repository contains all of the code necessary for reproducing the calculati
   - [thermophysicalProperties](saltOptimization/thermophysicalProperties/README.md)
     - [benchmarking](saltOptimization/thermophysicalProperties/benchmarking/README.md)
 - [scoping](scoping/README.md)
-  - [coreHeight](scoping/coreHeight/README.md)
 
 ## Requirements
 

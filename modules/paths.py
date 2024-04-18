@@ -78,3 +78,4 @@ SALT_OPTIMIZATION = here("saltOptimization")
 # ----------
 
 AVERAGE_COOLANT_CASE = here("cfd/3Dpincell/averageCoolant")
+SHORT_FUEL_CASE = here("cfd/3Dpincell/shortFuel")
