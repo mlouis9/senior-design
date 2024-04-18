@@ -1,0 +1,37 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website: https://www.openfoam.com
+    \\  /    A nd           | Version: v2112
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvOptions;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+
+// Name of the heat source, can be arbitrary
+fissionHeatSource
+{
+    // Type of source, using scalarSemiImplicitSource for energy equation
+    type            scalarSemiImplicitSource;
+
+    // Apply to entire domain
+    selectionMode   all;
+
+    // Specify as absolute source (W/m^3)
+    volumeMode      specific;
+
+    // Specify the field affected, here it's the enthalpy field
+    injectionRateSuSp
+    {
+        h           (100000000 0);  // 100,000,000 W/m^3 explicit, 0 implicit
+    }
+}
+
+// ************************************************************************* //

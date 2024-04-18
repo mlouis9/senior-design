@@ -28,13 +28,15 @@ boundaryField
 
     circularWall
     {
-        type            nonuniformFixedValue;
-        valueTable
+    	type            fixedProfile;
+   	    profile         table;
+	    profileCoeffs
         {
-            type        nonuniformTable;
-            axis        x;  // Specify the axis along which the profile varies (x, y, or z)
-            file        "axial_temp_profile.csv";  // File containing the temperature profile data
+            file		            "axial_temp_profile.csv";
+            interpolationScheme     linear;
         }
+	    direction       (0 0 1);
+	    origin 		    0;
     }
 
     defaultFaces
