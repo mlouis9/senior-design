@@ -59,20 +59,25 @@ class ArbitraryThermoFunction:
         self.units = units
 
     def __call__(self, temp):
-        if self.min_temp is not None and self.max_temp is not None:
-            if temp < self.min_temp or temp > self.max_temp:
-                warnings.warn(
-                    f"Temperature {temp} is outside the valid range [{self.min_temp}, {self.max_temp}]"
-                , UserWarning)
-        result = self.func(temp)
-        unc = abs(result*self.fractional_uncertainty) if self.fractional_uncertainty is not None else 0.0
-        try:
-            return ufloat(result, unc)
-        except: # Result is already a ufloat or another non-float datatype
-            try: # When using np.sum(), results can get converted into a np array of ufloats, just use .item() to conver to ufloat
-                return result.item()
-            except: # Result is already a ufloat
-                return result
+        if isinstance(temp, np.ndarray) or isinstance(temp, list):
+            # Vectorize the function
+            return np.array([self.__call__(val) for val in temp])
+        else:
+            if self.min_temp is not None and self.max_temp is not None:
+                if temp < self.min_temp or temp > self.max_temp:
+                    warnings.warn(
+                        f"Temperature {temp} is outside the valid range [{self.min_temp}, {self.max_temp}]"
+                    , UserWarning)
+            result = self.func(temp)
+            unc = abs(result*self.fractional_uncertainty) if self.fractional_uncertainty is not None else 0.0
+            try:
+                return ufloat(result, unc)
+            except: # Result is already a ufloat or another non-float datatype
+                try: # When using np.sum(), results can get converted into a np array of ufloats, just use .item() to conver to ufloat
+                    return result.item()
+                except: # Result is already a ufloat
+                    return result
+            
 
     def __add__(self, other):
         if isinstance(other, ArbitraryThermoFunction):
@@ -740,8 +745,12 @@ class Database:
         # A wrapper that extracts the nominal values from thermofunctions
         def extract_nominal_value(func):
             def wrapper(x):
-                y_with_uncertainty = func(x)
-                return y_with_uncertainty.nominal_value  # Extract the nominal value
+                if isinstance(x, np.ndarray) or isinstance(x, list):
+                    y_with_uncertainty = np.array([func(val).nominal_value for val in x]) # Extract the nominal value
+                    return y_with_uncertainty
+                else:
+                    y_with_uncertainty = func(x).nominal_value
+                
             return wrapper
         
         # If property is beta, then compute beta using numdiff tools
