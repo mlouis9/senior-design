@@ -7,7 +7,6 @@ Pint~=0.23
 pyprojroot~=0.3.0
 PySimpleGUI~=5.0.4
 pytest~=8.1.1
-SalinePy~=0.0.1
 scikit_learn~=1.4.1.post1
 scipy~=1.13.0
 Shapely~=2.0.4
