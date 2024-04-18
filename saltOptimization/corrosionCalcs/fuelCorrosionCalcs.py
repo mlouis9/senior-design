@@ -31,7 +31,7 @@ rho_clad = 7870
 def rho_fuel(T):
     return 1000*(4.1690 - 9.014E-04*T)
 
-ros = [2E-06, 5E-06] 
+ros = [2E-03, 5E-03] # Fuel tube inner radius in meters
 
 fuel_composition = {
     'Pu': 0.289756607,
@@ -160,7 +160,7 @@ for zr_fraction in zr_fractions:
         else:
             linestyle = 'solid'
 
-        plt.plot(temperatures, corrosion_depth/1E-09, label=f"{label} ($r_o$={ro*1E+06}mm)", marker='.', linestyle=linestyle, \
+        plt.plot(temperatures, corrosion_depth/1E-06, label=f"{label} ($r_o$={ro*1E+03}mm)", marker='.', linestyle=linestyle, \
                  color = colors[label])
 
 # Now finish off plot and save
