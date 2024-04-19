@@ -138,13 +138,13 @@ for ZrF2_fraction in ZrF2_fractions:
     # --------------------------
     
     # Write an input script
-    # thermoTools.WriteInputScript(scriptName, str(dataFile), elements, tstart, tend, ntstep, pstart, pend, npstep, masses, \
-    #                                 fuzzyStoichiometry=True, gibbsMinCheck=True)
+    thermoTools.WriteInputScript(scriptName, str(dataFile), elements, tstart, tend, ntstep, pstart, pend, npstep, masses, \
+                                    fuzzyStoichiometry=True, gibbsMinCheck=True)
     # Run an input script
     outputName = f"corrZrF2-{ZrF2_fraction*100:1.0f}.json"
 
-    # thermoTools.RunInputScript(scriptName, jsonName=str(outputPath / outputName), thermochimica_path=str(thermochimicaPath), \
-    #                                 noOutput=True)
+    thermoTools.RunInputScript(scriptName, jsonName=str(outputPath / outputName), thermochimica_path=str(thermochimicaPath), \
+                                    noOutput=True)
 
     # --------------------
     # Postprocess Results
