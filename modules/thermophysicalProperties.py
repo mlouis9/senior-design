@@ -750,6 +750,7 @@ class Database:
                     return y_with_uncertainty
                 else:
                     y_with_uncertainty = func(x).nominal_value
+                    return y_with_uncertainty
                 
             return wrapper
         
