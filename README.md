@@ -11,6 +11,7 @@ This repository contains all of the code necessary for reproducing the calculati
     - [shortFuel](cfd/3Dpincell/shortFuel/README.md)
     - [worstCaseCoolant](cfd/3Dpincell/worstCaseCoolant/README.md)
   - [initialModels](cfd/initialModels/README.md)
+  - [pincellGeometry](cfd/pincellGeometry/README.md)
 - [finalDeliverables](finalDeliverables/README.md)
 - [modules](modules/README.md)
 - [saltOptimization](saltOptimization/README.md)
