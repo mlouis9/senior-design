@@ -1,4 +1,5 @@
-
+# Introduction
+This directory contains the coolant and fuel optimization calculations as well as the [thermophysical property benchmarking](benchmarking/README.md). In addition, the notebook [here](finalProperties.ipynb) shows the calculated thermophysical properties of the final coolant and fuel salts as well as their polynomial fits, which were used for representing thermophysical properties in the CFD calculations.
 
 # Notes
 This is true in general with Jupyter notebooks, but it's a good idea to try restarting the jupyter kernel (which deletes any saved global variables) if you're met with any errors when trying to run the notebook for example

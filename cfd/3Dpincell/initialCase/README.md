@@ -1,0 +1,2 @@
+# Initial Case
+This directory contains an initial attempt at the coolant calculation using the builtin blockMesh mesh generation. As can be seen by viewing the meshing and running a mesh check, the resultant mesh is not suitable for CFD, likely due to some incorrect inputs somewhere within the `blockMeshDict`. Although this is irrelevant to the final results, this is left as an example. Mesh generation was later done using cfmesh using the CFDOF extension in FreeCAD.

@@ -1,0 +1,2 @@
+# Thermochimica Benchmarking
+This directory contains the script used for generating the benchmark cases for the thermochimica pseudo binary phase diagram generation. While the phase diagram generation tool itself is native to thermochimica, the plotting and solubility calculation routines are custom (the code is [here](../../modules/thermoToolsAdditions.py)) and so they were benchmarked. More information (along with references for the comparisons) can be found in the [final report](../../finalDeliverables/Final_Report.pdf).

@@ -1,0 +1,2 @@
+# Short Fuel
+This is the OpenFOAM case for the fuel salt calculation over a shortened (10mm tall) domain. This was considered because it was easier to converge than the full length (3m) case. The entire axial temperature profile from the average coolant case was imposed on this shorter domain, and can be seen in [axial_temp_profile.csv](axial_temp_profile.csv), and the results are processed with paraview and plotted in [supplementaryCalcs.ipynb](supplementaryCalcs.ipynb)

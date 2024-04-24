@@ -1,0 +1,2 @@
+# Corrosion Calculations
+This directory contains the code used for doing the fuel and coolant corrosion calcuations using Thermochimica. These scripts rely on manually generating thermochimica input files and running them using the thermoTools script that's built into Thermochimica.

@@ -153,7 +153,7 @@ for ZrF2_fraction in ZrF2_fractions:
     # Now read the output using tta and plot
     calc = tta.thermoOut(str(script_dir / f'outputs/{outputName}'))
 
-    label = f"ZrF$_2$/ZrF$_4$ {ZrF2_fraction*100:2.1f}%"
+    label = f"ZrF$_2$/(ZrF$_2$ + ZrF$_4$) {ZrF2_fraction*100:2.1f}%"
 
     nstates = len(list(calc.output.keys()))
     M_corr.update({label: np.zeros(nstates)})
